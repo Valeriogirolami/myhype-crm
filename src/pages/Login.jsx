@@ -40,8 +40,11 @@ export default function Login() {
       await signIn(values.email, values.password)
       // Il redirect avviene automaticamente perché user diventa non-null
     } catch (err) {
-      // DEBUG: mostro il messaggio originale completo per capire il problema
-      setServerError(`${err?.message || 'errore sconosciuto'} [status: ${err?.status || 'n/a'}, code: ${err?.code || 'n/a'}]`)
+      setServerError(
+        err?.message?.toLowerCase().includes('invalid')
+          ? 'Email o password errate.'
+          : `Errore: ${err?.message || 'impossibile accedere.'}`
+      )
     } finally {
       setSubmitting(false)
     }
@@ -161,12 +164,6 @@ export default function Login() {
 
         <p className="mt-6 text-center text-xs text-text-muted">
           © {new Date().getFullYear()} Hype — Uso interno
-        </p>
-        {/* DEBUG temporaneo: verifica che le env vars siano caricate */}
-        <p className="mt-2 text-center text-[10px] text-text-muted/40 break-all">
-          API: {import.meta.env.VITE_SUPABASE_URL || '⚠️ URL MANCANTE'}
-          {' · '}
-          Key: {import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? `${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY.slice(0, 25)}…` : '⚠️ KEY MANCANTE'}
         </p>
       </motion.div>
     </div>
