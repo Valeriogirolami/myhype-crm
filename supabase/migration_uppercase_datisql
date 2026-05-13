@@ -1,0 +1,28 @@
+-- ============================================================================
+-- Migration: normalizza in MAIUSCOLO i campi testuali dei collaboratori e utenti
+--
+-- Applica UPPER() su: nome, cognome, indirizzo, ruolo (collaboratori)
+-- e su nome, cognome (utenti).
+--
+-- NON tocca:
+--  - email (case-insensitive per convenzione)
+--  - codice_fiscale (già MAIUSCOLO)
+--  - iban / p_iva / telefono (codici/numeri)
+--  - regime_fiscale / stato (enum lowercase obbligatori dal DB)
+--
+-- Sicura da rieseguire (idempotente: UPPER su MAIUSCOLO resta MAIUSCOLO).
+-- ============================================================================
+
+update public.collaboratori set
+  nome      = upper(nome),
+  cognome   = upper(cognome),
+  indirizzo = upper(indirizzo),
+  ruolo     = upper(ruolo);
+
+update public.utenti set
+  nome    = upper(nome),
+  cognome = upper(cognome);
+
+-- ============================================================================
+-- Fine. Ora tutti i nomi/cognomi/indirizzi/ruoli sono uniformi in MAIUSCOLO.
+-- ============================================================================

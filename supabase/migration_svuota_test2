@@ -1,0 +1,46 @@
+-- ============================================================================
+-- Migration: pulizia parziale dati di test (PdV / Collaboratori / Contratti)
+--
+-- Cancella:
+--   - Tutti i contratti (e contratto_sottoprodotti via cascade)
+--   - Tutti i clienti (orfani senza contratti)
+--   - Tutti i collaboratori (e pdv_collaboratori via cascade)
+--   - Tutti i PdV (e gli override target_pdv_override via cascade)
+--   - Tutte le notifiche generate (legate a contratti/eventi pregressi)
+--
+-- Conserva:
+--   - Account utenti (admin, bo, ...)
+--   - Sottoprodotti (anagrafica prodotti)
+--   - Soglie Gara Gallery (gara_gallery_soglie)
+--   - Target base (target_base) — le 8 combinazioni Tipo×Categoria restano
+--
+-- Sicura da rieseguire.
+-- ============================================================================
+
+-- 1) Contratti e relazioni (contratto_sottoprodotti via cascade)
+delete from public.contratto_sottoprodotti;
+delete from public.contratti;
+
+-- 2) Clienti (non hanno più contratti, sarebbero orfani)
+delete from public.clienti;
+
+-- 3) Notifiche pregresse (KO contratti, top 3, ecc.)
+delete from public.notifiche;
+
+-- 4) Associazioni PdV ↔ Collaboratori (per sicurezza, anche se cascade ci pensa)
+delete from public.pdv_collaboratori;
+
+-- 5) Collaboratori (venditori, TM, AS, DV anagrafici)
+--    Azzero account_id per evitare blocchi su FK SET NULL
+update public.collaboratori set account_id = null;
+delete from public.collaboratori;
+
+-- 6) PdV (cascade su target_pdv_override e pdv_collaboratori)
+--    Azzero account_id sui PdV per evitare blocchi su FK SET NULL
+update public.pdv set account_id = null;
+delete from public.pdv;
+
+-- ============================================================================
+-- Fine. Restano: utenti applicativi, sottoprodotti, gara_gallery_soglie,
+-- target_base. Pronto per ripopolare con dati reali.
+-- ============================================================================

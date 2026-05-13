@@ -1,0 +1,199 @@
+-- ============================================================================
+-- Caricamento massivo collaboratori + creazione account per TM/AS/DV
+--
+-- 14 collaboratori dal CSV:
+--  - 10 Venditori (no account login)
+--  - 1 Team Manager: Giacomo Palandri (con account)
+--  - 2 Area Sales: Matteo Todini, Simone Chiominto (con account)
+--  - 1 Direttore Vendite: Manuel Madeddu (con account)
+--
+-- Note di pulizia applicate:
+--  - CF normalizzati in MAIUSCOLO, senza spazi
+--  - Date convertite da DD/MM/YYYY in YYYY-MM-DD
+--  - Email pulite da spazi/newline
+--  - P.IVA con 0 iniziale aggiunto per Palandri (02420830974) e Madeddu (04829050402)
+--  - IBAN lituano di Subhadra accettato così com'è
+--  - Vanessa Merletti senza IBAN (campo opzionale → null)
+--
+-- Account login:
+--  Per i 4 non-venditori vengono creati account auth + riga utenti +
+--  collegamento al collaboratore (collaboratori.account_id).
+--  Password iniziale uguale per tutti: MyHype2026!
+-- ============================================================================
+
+-- ============================================================================
+-- PARTE 1 — Inserimento collaboratori
+-- ============================================================================
+
+insert into public.collaboratori (
+  nome, cognome, codice_fiscale, data_nascita, indirizzo, email, telefono,
+  ruolo, regime_fiscale, p_iva, iban, data_assunzione, stato
+) values
+-- 1. DEMENTIN OSMANOV
+('DEMENTIN', 'OSMANOV', 'SMNDNT03P30Z154G', '2003-09-30',
+ 'Via Guglielmo Quattrucci 250, Grottaferrata (RM) 00046',
+ 'Odementii@gmail.com', '3758133716',
+ 'Venditore', 'ritenuta_acconto', null, 'IT83T0357601601010005483161',
+ '2026-03-16', 'attivo'),
+
+-- 2. ELENA MUSTACCHIA
+('ELENA', 'MUSTACCHIA', 'MSTLNE02B63I533C', '2002-02-23',
+ 'Corso Accursio Miraglia 246, Sciacca (AG) 92019',
+ 'elenamusta.alice.it@gmail.com', '3891586313',
+ 'Venditore', 'ritenuta_acconto', null, 'IT25Z0200883172000420549273',
+ '2026-03-23', 'attivo'),
+
+-- 3. MATTEO CONSTANTIN PETRACHE
+('MATTEO CONSTANTIN', 'PETRACHE', 'PTRMTC06D05H501B', '2006-04-05',
+ 'Via della Muratella 49/A, Roma (RM) 00148',
+ 'Petrache.matteoconstantin1@gmail.com', '3802884268',
+ 'Venditore', 'ritenuta_acconto', null, 'IT59Q0366901600731184534839',
+ '2026-04-07', 'attivo'),
+
+-- 4. SUBHADRA DEVI PANCHOO
+('SUBHADRA', 'DEVI PANCHOO', 'PNCSHD04D56Z332B', '2004-04-16',
+ 'Via Filippo Corazza 103, Palermo (PA) 90127',
+ 'tishapanchoo25@gmail.com', '3278668262',
+ 'Venditore', 'ritenuta_acconto', null, 'LT523250092189992427',
+ '2026-04-09', 'attivo'),
+
+-- 5. GABRIELE MICARELLI
+('GABRIELE', 'MICARELLI', 'MCRGRL94L30L182G', '1994-07-30',
+ 'Via Veneto 7/A, Tivoli (RM) 00019',
+ 'irr.gm94@hotmail.it', '3317249386',
+ 'Venditore', 'ritenuta_acconto', null, 'IT81E036690160035702055998',
+ '2026-04-13', 'attivo'),
+
+-- 6. AMINARANI MEHAR
+('AMINARANI', 'MEHAR', 'MHRMRN02T47H501U', '2002-12-07',
+ 'Via Matteo Tondi 22, Roma (RM) 00158',
+ 'aminamehar0712@gmail.com', '3517947490',
+ 'Venditore', 'ritenuta_acconto', null, 'IT72X3608105138266340166351',
+ '2026-04-27', 'attivo'),
+
+-- 7. Inasse Dirane
+('Inasse', 'Dirane', 'DRNNSS02C55B393H', '2002-03-15',
+ 'Via Dante Alighieri 3, Romano Di Lombardia (BG) 24058',
+ 'dirane.inasse19@gmail.com', '3382925473',
+ 'Venditore', 'ritenuta_acconto', null, 'IT41H0851453421000000034533',
+ '2026-04-07', 'attivo'),
+
+-- 8. Luca Corbani
+('Luca', 'Corbani', 'CRBLCU04R29A794Z', '2004-10-29',
+ 'Via Verne 7, Bagnatica (BG) 24060',
+ 'lucacorba@gmail.com', '3791275849',
+ 'Venditore', 'ritenuta_acconto', null, 'IT38R0338501601100000200264',
+ '2026-04-10', 'attivo'),
+
+-- 9. Clarhenze Arnelson Capa
+('Clarhenze Arnelson', 'Capa', 'CPAJLR07B16A794G', '2007-02-16',
+ 'Via Paolo Gaffuri 4, Bergamo (BG)',
+ 'jclarhenzecapa@gmail.com', '3793213132',
+ 'Venditore', 'ritenuta_acconto', null, 'IT38W0366901600171786344532',
+ '2026-04-28', 'attivo'),
+
+-- 10. Giacomo Palandri (Team Manager — avrà account)
+('Giacomo', 'Palandri', 'PLNGCM89M06G999T', '1989-08-06',
+ 'Via Michelozzo 6/1, Prato (PO) 59100',
+ 'Giacomo891989@hotmail.com', '3398126566',
+ 'Team Manager', 'p_iva', '02420830974', 'IT60V0200821401000102912613',
+ '2026-04-01', 'attivo'),
+
+-- 11. Matteo Todini (Area Sales — avrà account)
+('Matteo', 'Todini', 'TDNMTT96S13F032N', '1996-11-13',
+ 'Via Zara 13, Gavorrano (GR) 58023',
+ 'matteo.todini@hypesrl.eu', '3770861315',
+ 'Area Sales', 'assunto', null, 'IT50A0306905239100000004585',
+ '2025-04-01', 'attivo'),
+
+-- 12. Simone Chiominto (Area Sales — avrà account)
+('Simone', 'Chiominto', 'CHMSMN88D08L182A', '1988-04-08',
+ 'Via Notaresco 28, Roma (RM) 00132',
+ 's.chiominto@hypesrl.eu', '3397293966',
+ 'Area Sales', 'assunto', null, 'IT88X0358901600010570741782',
+ '2026-04-01', 'attivo'),
+
+-- 13. Vanessa Merletti (senza IBAN come da CSV)
+('Vanessa', 'Merletti', 'MRLVSS06A48B393P', '2006-01-08',
+ 'Via Belvedere 28/B/9, Bolgare (BG)',
+ 'vanessaa.merletti@gmail.com', '3408560773',
+ 'Venditore', 'ritenuta_acconto', null, null,
+ '2026-04-27', 'attivo'),
+
+-- 14. Manuel Madeddu (Direttore Vendite — avrà account)
+('Manuel', 'Madeddu', 'MDDMNL87D30H501Y', '1987-04-30',
+ 'Via Giuseppe Impastato 687, Cesena (FC)',
+ 'm.madeddu@hypesrl.eu', '3292945191',
+ 'Direttore Vendite', 'p_iva', '04829050402', 'IT87H0329601601000067771182',
+ '2026-04-01', 'attivo');
+
+-- ============================================================================
+-- PARTE 2 — Creazione account login per i 4 non-venditori
+-- Password iniziale: MyHype2026!
+-- ============================================================================
+
+-- Helper: funzione anonima che crea auth user + utenti + collega collaboratore
+-- per ogni record da inserire. Mappa per CF del collaboratore.
+
+do $$
+declare
+  rec record;
+  new_uid uuid;
+  pwd_hash text;
+begin
+  -- I 4 account da creare (CF collaboratore → email + ruolo + nome/cognome)
+  for rec in
+    select * from (values
+      ('PLNGCM89M06G999T', 'Giacomo891989@hotmail.com',   'Giacomo', 'Palandri',  'tm'),
+      ('TDNMTT96S13F032N', 'matteo.todini@hypesrl.eu',    'Matteo',  'Todini',    'as'),
+      ('CHMSMN88D08L182A', 's.chiominto@hypesrl.eu',      'Simone',  'Chiominto', 'as'),
+      ('MDDMNL87D30H501Y', 'm.madeddu@hypesrl.eu',        'Manuel',  'Madeddu',   'dv')
+    ) as t(cf, email, nome, cognome, ruolo)
+  loop
+    -- Salto se già esiste un account con quella email
+    if exists (select 1 from auth.users where email = rec.email) then
+      raise notice 'Skip % — email già presente', rec.email;
+      continue;
+    end if;
+
+    new_uid := gen_random_uuid();
+    pwd_hash := crypt('MyHype2026!', gen_salt('bf'));
+
+    -- 1) auth.users
+    insert into auth.users (
+      id, instance_id, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, aud, role,
+      created_at, updated_at
+    ) values (
+      new_uid,
+      '00000000-0000-0000-0000-000000000000',
+      rec.email,
+      pwd_hash,
+      now(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      jsonb_build_object('nome', rec.nome, 'cognome', rec.cognome),
+      'authenticated',
+      'authenticated',
+      now(),
+      now()
+    );
+
+    -- 2) public.utenti (profilo applicativo)
+    insert into public.utenti (id, email, nome, cognome, ruolo, attivo)
+    values (new_uid, rec.email, rec.nome, rec.cognome, rec.ruolo::ruolo_utente, true);
+
+    -- 3) Aggancia all'anagrafica collaboratore
+    update public.collaboratori
+      set account_id = new_uid
+      where codice_fiscale = rec.cf;
+
+    raise notice 'Creato account % (ruolo: %)', rec.email, rec.ruolo;
+  end loop;
+end $$;
+
+-- ============================================================================
+-- Fine. Risultato atteso:
+--   - 14 collaboratori in public.collaboratori
+--   - 4 nuovi account in auth.users e public.utenti
+--   - I 4 collaboratori TM/AS/DV hanno account_id valorizzato
+-- ============================================================================

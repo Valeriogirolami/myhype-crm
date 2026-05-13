@@ -1,0 +1,57 @@
+-- ============================================================================
+-- FIX: aggiunta riga in auth.identities per i 4 utenti creati via SQL.
+--
+-- Su Supabase Auth, ogni utente che fa login con email/password deve avere
+-- ANCHE una riga in auth.identities con provider='email'. Senza, l'auth
+-- fallisce con "Database error querying schema".
+--
+-- Sicura da rieseguire (controlla se l'identity esiste già).
+-- ============================================================================
+
+do $$
+declare
+  u record;
+begin
+  for u in
+    select id, email from auth.users
+    where email in (
+      'Giacomo891989@hotmail.com',
+      'matteo.todini@hypesrl.eu',
+      's.chiominto@hypesrl.eu',
+      'm.madeddu@hypesrl.eu'
+    )
+  loop
+    -- Salto se identity 'email' già presente
+    if exists (
+      select 1 from auth.identities
+      where user_id = u.id and provider = 'email'
+    ) then
+      raise notice 'Skip % — identity già presente', u.email;
+      continue;
+    end if;
+
+    insert into auth.identities (
+      provider_id, user_id, identity_data, provider,
+      last_sign_in_at, created_at, updated_at
+    ) values (
+      u.id::text,
+      u.id,
+      jsonb_build_object(
+        'sub', u.id::text,
+        'email', u.email,
+        'email_verified', true,
+        'phone_verified', false
+      ),
+      'email',
+      null,
+      now(),
+      now()
+    );
+
+    raise notice 'Identity creata per %', u.email;
+  end loop;
+end $$;
+
+-- ============================================================================
+-- Fine. Dopo questa migration i 4 account TM/AS/DV possono fare login.
+-- ============================================================================

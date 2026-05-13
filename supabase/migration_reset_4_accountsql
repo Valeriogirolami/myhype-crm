@@ -1,0 +1,29 @@
+-- ============================================================================
+-- FIX: cancella i 4 account creati via SQL diretto e azzera account_id dei
+-- collaboratori, così possono essere ricreati dall'app via "Crea account"
+-- (Edge Function ufficiale Supabase, garantito funzionante).
+-- ============================================================================
+
+-- 1) Azzera account_id sui 4 collaboratori (CF dei TM/AS/DV)
+update public.collaboratori
+set account_id = null
+where codice_fiscale in (
+  'PLNGCM89M06G999T',  -- Giacomo Palandri
+  'TDNMTT96S13F032N',  -- Matteo Todini
+  'CHMSMN88D08L182A',  -- Simone Chiominto
+  'MDDMNL87D30H501Y'   -- Manuel Madeddu
+);
+
+-- 2) Cancella auth.users (cascade su public.utenti via FK ON DELETE CASCADE)
+delete from auth.users
+where email in (
+  'Giacomo891989@hotmail.com',
+  'matteo.todini@hypesrl.eu',
+  's.chiominto@hypesrl.eu',
+  'm.madeddu@hypesrl.eu'
+);
+
+-- ============================================================================
+-- Fine. I 4 account sono spariti. Ora ricreali dalla pagina Collaboratori
+-- con il bottone "Crea account" — usa la Edge Function ufficiale Supabase.
+-- ============================================================================

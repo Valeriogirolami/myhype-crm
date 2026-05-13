@@ -57,6 +57,9 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
   const [quickData, setQuickData] = useState({})
   const [quickLoading, setQuickLoading] = useState(false)
 
+  // Stato delete contratto (+ eventuale cliente orfano)
+  const [deleting, setDeleting] = useState(false)
+
   // Liste ausiliarie per i select in modalità edit
   const [personeDisp, setPersoneDisp] = useState([])      // per "venditore"
   const [sottoprodottiDisp, setSottoprodottiDisp] = useState([]) // per cambio prodotto
@@ -311,6 +314,65 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
     }
   }
 
+  /**
+   * Elimina completamente il contratto. Se il cliente associato non ha
+   * altri contratti, viene eliminato anche lui (richiesta utente).
+   * Solo Admin/BO.
+   */
+  async function eliminaContratto() {
+    if (!data) return
+    const clienteNome = data.cliente?.categoria === 'azienda'
+      ? data.cliente?.ragione_sociale
+      : `${data.cliente?.nome || ''} ${data.cliente?.cognome || ''}`.trim()
+    const conferma = window.confirm(
+      `Vuoi eliminare DEFINITIVAMENTE questo contratto?\n\n` +
+      `Cliente: ${clienteNome}\n` +
+      `Prodotto: ${data.prodotto}\n\n` +
+      `⚠️ Se il cliente non ha altri contratti, verrà eliminato anche lui.\n` +
+      `L'operazione è IRREVERSIBILE.`
+    )
+    if (!conferma) return
+
+    setDeleting(true)
+    try {
+      const clienteId = data.cliente?.id
+      const contrattoId = data.id
+
+      // 1) Cancello il contratto (cascade su contratto_sottoprodotti)
+      const { error: errCtr } = await supabase
+        .from('contratti').delete().eq('id', contrattoId)
+      if (errCtr) throw errCtr
+
+      // 2) Controllo se il cliente ha altri contratti
+      let clienteEliminato = false
+      if (clienteId) {
+        const { count } = await supabase
+          .from('contratti')
+          .select('*', { count: 'exact', head: true })
+          .eq('cliente_id', clienteId)
+        if (!count || count === 0) {
+          // Nessun altro contratto → elimino anche il cliente
+          const { error: errCli } = await supabase
+            .from('clienti').delete().eq('id', clienteId)
+          if (!errCli) clienteEliminato = true
+          else console.warn('[delete] errore eliminazione cliente:', errCli.message)
+        }
+      }
+
+      toast.success(
+        clienteEliminato
+          ? 'Contratto e cliente eliminati.'
+          : 'Contratto eliminato.'
+      )
+      onUpdated?.()
+      onClose?.()
+    } catch (err) {
+      toast.error(`Errore eliminazione: ${err.message}`)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   function toggleSottoprodotto(spId) {
     setForm(prev => {
       const set = new Set(prev.sottoprodotti_ids || [])
@@ -513,6 +575,11 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
         ) : (
           <>
             <Button variant="secondary" onClick={onClose}>Chiudi</Button>
+            {isBoAdmin && data && (
+              <Button variant="danger" onClick={eliminaContratto} loading={deleting}>
+                <Trash2 size={14} /> Elimina
+              </Button>
+            )}
             {isBoAdmin && data && (
               <Button onClick={() => setEditing(true)}>
                 <Edit3 size={14} /> Modifica

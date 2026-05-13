@@ -1,0 +1,25 @@
+-- ============================================================================
+-- Migration: cancellazione account utenti di test
+--
+-- Cancella gli account dei cognomi indicati da:
+--   - auth.users (tabella di autenticazione)
+--   - public.utenti (cancellato via CASCADE dalla foreign key)
+--
+-- Account preservati: Daniele Abbonizio + Sergiy.
+-- ============================================================================
+
+-- (Opzionale) Anteprima — esegui PRIMA questa riga da sola per vedere chi
+-- verrà cancellato. Se la lista è giusta, esegui poi la DELETE sotto.
+-- ----------------------------------------------------------------------------
+select id, email, nome, cognome, ruolo
+from public.utenti
+where lower(cognome) in ('muratella', 'todini', 'chiominto', 'madeddu');
+
+-- Cancellazione vera (esegui dopo aver visto la preview)
+-- Cancellando da auth.users si cancella anche da public.utenti per CASCADE.
+-- ----------------------------------------------------------------------------
+delete from auth.users
+where id in (
+  select id from public.utenti
+  where lower(cognome) in ('muratella', 'todini', 'chiominto', 'madeddu')
+);
