@@ -1,0 +1,25 @@
+-- ============================================================================
+-- Migration: distinzione Luce/Gas per i sottoprodotti Energia
+--
+-- Motivazione (Valerio 2026-04-24): un cliente che acquista Luce + Gas deve
+-- generare 2 contratti distinti (sono 2 forniture diverse, due conteggi).
+-- Mobile e Fisso restano monolitici (es. MNP + Minuti = 1 contratto = 1 SIM).
+--
+-- Aggiungiamo:
+--  - nuovo enum tipo_energia ('luce' | 'gas')
+--  - colonna tipo_energia su sottoprodotti, NULLABLE
+--    (popolata solo per i sottoprodotti con prodotto_padre = 'energia')
+--
+-- Niente check constraint "duro" per non bloccare i dati esistenti — il
+-- vincolo lo applichiamo lato app (form sottoprodotto + form contratto).
+--
+-- Sicura da rieseguire.
+-- ============================================================================
+
+do $$ begin
+  create type tipo_energia as enum ('luce', 'gas');
+exception when duplicate_object then null;
+end $$;
+
+alter table public.sottoprodotti
+  add column if not exists tipo_energia tipo_energia;

@@ -1,0 +1,11 @@
+-- ============================================================================
+-- Migration: aggiunta colonna telefono_fisso ai clienti
+--
+-- Motivazione: distinguere numero cellulare (campo "telefono", obbligatorio)
+-- da numero fisso (nuovo campo, facoltativo).
+--
+-- Sicura da rieseguire: "if not exists" non dà errore se la colonna c'è già.
+-- ============================================================================
+
+alter table public.clienti
+  add column if not exists telefono_fisso text;

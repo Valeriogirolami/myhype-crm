@@ -1,0 +1,12 @@
+-- ============================================================================
+-- Migration: rendiamo IBAN opzionale sui clienti
+--
+-- Lo schema iniziale aveva iban NOT NULL. Su richiesta Valerio (2026-04-24)
+-- l'IBAN diventa facoltativo: tipico in fase di sottoscrizione iniziale,
+-- compilato in seguito quando il cliente lo fornisce.
+--
+-- Sicura da rieseguire.
+-- ============================================================================
+
+alter table public.clienti
+  alter column iban drop not null;

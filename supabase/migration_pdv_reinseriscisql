@@ -1,0 +1,34 @@
+-- ============================================================================
+-- Migration: permesso al PdV proprietario di REINSERIRE un contratto
+--
+-- Lo schema iniziale aveva la policy "contratti_update_admin_bo" che permette
+-- l'update solo ad admin/bo. Lo SPEC §4.7 prevede però che anche il PdV
+-- proprietario possa fare il "Reinserisci" su un contratto in KO non validato
+-- (riportandolo a "Da validare").
+--
+-- Questa policy AGGIUNTIVA (non sostituisce le esistenti) permette al PdV:
+--  - SOLO sui contratti del proprio PdV (pdv.account_id = auth.uid())
+--  - SOLO se lo stato corrente è 'ko_non_validato'
+--  - SOLO per portarlo a 'da_validare'
+-- Tutte le altre transizioni di stato restano riservate a admin/bo.
+--
+-- Sicura da rieseguire grazie a "drop policy if exists".
+-- ============================================================================
+
+drop policy if exists "contratti_pdv_reinserisci" on public.contratti;
+
+create policy "contratti_pdv_reinserisci"
+  on public.contratti for update
+  using (
+    public.current_user_role() = 'pdv'
+    and exists (
+      select 1 from public.pdv p
+      where p.id = contratti.pdv_id
+        and p.account_id = auth.uid()
+    )
+    and stato = 'ko_non_validato'
+  )
+  with check (
+    public.current_user_role() = 'pdv'
+    and stato = 'da_validare'
+  );

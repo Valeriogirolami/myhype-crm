@@ -1,0 +1,215 @@
+-- ============================================================================
+-- MyHype — RLS Policy v1
+-- Policy di sicurezza base sulle tabelle (Step 3 della roadmap §15).
+--
+-- Versione iniziale: permissiva in lettura per tutti gli utenti loggati,
+-- scrittura riservata ad admin/bo. Raffineremo le policy per ruolo
+-- (AS/TM/PdV scope-based) in uno step successivo (Step 11+).
+--
+-- Da eseguire UNA VOLTA SOLA nel SQL Editor di Supabase.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- Funzione helper: ritorna il ruolo dell'utente loggato (o null se non loggato)
+-- "security definer" le permette di leggere public.utenti anche sotto RLS.
+-- "stable" permette al planner di cacharla nella stessa query.
+-- ----------------------------------------------------------------------------
+create or replace function public.current_user_role()
+returns text
+language sql
+security definer
+stable
+as $$
+  select ruolo::text from public.utenti where id = auth.uid()
+$$;
+
+-- Diamo permesso di esecuzione ai ruoli Supabase
+grant execute on function public.current_user_role() to anon, authenticated;
+
+-- ============================================================================
+-- TABELLA: utenti
+-- - Ogni utente può leggere e aggiornare la propria riga
+-- - Admin e BO possono leggere/scrivere tutto
+-- ============================================================================
+
+-- Self: lettura propria riga
+create policy "utenti_self_select"
+  on public.utenti for select
+  using (id = auth.uid());
+
+-- Self: aggiornamento proprio profilo
+create policy "utenti_self_update"
+  on public.utenti for update
+  using (id = auth.uid())
+  with check (id = auth.uid());
+
+-- Admin/BO: tutto (§11)
+create policy "utenti_admin_bo_all"
+  on public.utenti for all
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- TABELLA: pdv
+-- - Tutti i loggati in lettura (lo scope per ruolo lo applichiamo nell'app
+--   e raffineremo lato DB in uno step dedicato)
+-- - Admin/BO scrivono
+-- ============================================================================
+
+create policy "pdv_read_authenticated"
+  on public.pdv for select
+  using (auth.uid() is not null);
+
+create policy "pdv_write_admin_bo"
+  on public.pdv for all
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- TABELLA: collaboratori
+-- ============================================================================
+
+create policy "collab_read_authenticated"
+  on public.collaboratori for select
+  using (auth.uid() is not null);
+
+create policy "collab_write_admin_bo"
+  on public.collaboratori for all
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- TABELLA: pdv_collaboratori (associazioni)
+-- ============================================================================
+
+create policy "pdv_coll_read_authenticated"
+  on public.pdv_collaboratori for select
+  using (auth.uid() is not null);
+
+create policy "pdv_coll_write_admin_bo"
+  on public.pdv_collaboratori for all
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- TABELLA: clienti
+-- ============================================================================
+
+create policy "clienti_read_authenticated"
+  on public.clienti for select
+  using (auth.uid() is not null);
+
+create policy "clienti_insert_authenticated"
+  on public.clienti for insert
+  with check (auth.uid() is not null);
+
+create policy "clienti_update_admin_bo"
+  on public.clienti for update
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- TABELLA: sottoprodotti
+-- Tutti leggono (servono nella tendina nuovo contratto), Admin/BO scrivono.
+-- ============================================================================
+
+create policy "sottoprod_read_authenticated"
+  on public.sottoprodotti for select
+  using (auth.uid() is not null);
+
+create policy "sottoprod_write_admin_bo"
+  on public.sottoprodotti for all
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- TABELLA: contratti
+-- Insert: anche PdV (i PdV creano i propri contratti, §11)
+-- Update / Transizioni di stato: admin/bo
+-- Select: tutti loggati (scope applicato lato app per ora)
+-- ============================================================================
+
+create policy "contratti_read_authenticated"
+  on public.contratti for select
+  using (auth.uid() is not null);
+
+create policy "contratti_insert_pdv_bo_admin"
+  on public.contratti for insert
+  with check (public.current_user_role() in ('admin','bo','pdv'));
+
+create policy "contratti_update_admin_bo"
+  on public.contratti for update
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+create policy "contratti_delete_admin"
+  on public.contratti for delete
+  using (public.current_user_role() = 'admin');
+
+-- ============================================================================
+-- TABELLA: contratto_sottoprodotti
+-- ============================================================================
+
+create policy "contratto_sp_read_authenticated"
+  on public.contratto_sottoprodotti for select
+  using (auth.uid() is not null);
+
+create policy "contratto_sp_write_authenticated"
+  on public.contratto_sottoprodotti for all
+  using (public.current_user_role() in ('admin','bo','pdv'))
+  with check (public.current_user_role() in ('admin','bo','pdv'));
+
+-- ============================================================================
+-- TABELLA: target_base / target_pdv_override
+-- Lettura a tutti, scrittura admin/bo
+-- ============================================================================
+
+create policy "target_base_read_authenticated"
+  on public.target_base for select
+  using (auth.uid() is not null);
+
+create policy "target_base_write_admin_bo"
+  on public.target_base for all
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+create policy "target_pdv_read_authenticated"
+  on public.target_pdv_override for select
+  using (auth.uid() is not null);
+
+create policy "target_pdv_write_admin_bo"
+  on public.target_pdv_override for all
+  using (public.current_user_role() in ('admin','bo'))
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- TABELLA: gara_gallery_soglie
+-- Solo admin scrive/legge i premi (§11: Fatturato Azienda visibile solo ad admin)
+-- ============================================================================
+
+create policy "gara_soglie_admin_all"
+  on public.gara_gallery_soglie for all
+  using (public.current_user_role() = 'admin')
+  with check (public.current_user_role() = 'admin');
+
+-- ============================================================================
+-- TABELLA: notifiche
+-- Ogni utente vede/aggiorna solo le proprie notifiche
+-- ============================================================================
+
+create policy "notifiche_self_select"
+  on public.notifiche for select
+  using (destinatario = auth.uid());
+
+create policy "notifiche_self_update"
+  on public.notifiche for update
+  using (destinatario = auth.uid())
+  with check (destinatario = auth.uid());
+
+create policy "notifiche_admin_bo_insert"
+  on public.notifiche for insert
+  with check (public.current_user_role() in ('admin','bo'));
+
+-- ============================================================================
+-- FINE policy v1 — da raffinare con scope per AS/TM/PdV in step successivi
+-- ============================================================================

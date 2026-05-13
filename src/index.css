@@ -1,0 +1,135 @@
+/* ============================================================
+   MyHype — stylesheet globale
+   Tailwind v4 + palette Hype (§0 SPEC)
+   ============================================================ */
+
+/* Font Inter via Google Fonts — DEVE stare prima di tutti gli altri @import */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* ------------------------------------------------------------
+   Tema Hype — palette custom + token semantici
+   I nomi servono a chiamarli ovunque come bg-bg, text-accent, ecc.
+   ------------------------------------------------------------ */
+@theme {
+  /* Font */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Background / Superfici */
+  --color-bg: #0B1026;           /* blu notte profondo — background primario */
+  --color-surface: #141B3A;      /* blu notte elevato — card, sidebar */
+  --color-border: #232A4A;       /* divisori sottili */
+
+  /* Accent */
+  --color-accent: #2B6CFF;       /* blu elettrico primario */
+  --color-accent-2: #5B8FFF;     /* blu secondo stop gradiente */
+
+  /* Testo */
+  --color-text: #FFFFFF;         /* primario */
+  --color-text-muted: #A3ADC9;   /* secondario — grigio-azzurro tenue */
+
+  /* Stati */
+  --color-success: #3DD68C;      /* verde menta */
+  --color-warning: #F5B042;      /* ambra */
+  --color-danger:  #FF5A6E;      /* rosso corallo */
+  --color-info:    #7A9BFF;      /* azzurro chiaro */
+
+  /* Ombre soft (iOS-like) */
+  --shadow-soft: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* ------------------------------------------------------------
+   Base globale — dark mode di default
+   ------------------------------------------------------------ */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Numeri sempre in tabular per allineamento pulito nelle tabelle (§0) */
+.tnum, table, .kpi {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar discreta coerente con la palette */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #232A4A;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: #2d345a; }
+
+/* Focus ring accessibile e coerente col brand */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Utility gradiente primario (bottoni principali, KPI highlight) */
+.bg-gradient-primary {
+  background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-accent-2) 100%);
+}
+
+/* ============================================================
+   Organigramma — connettori "ad albero"
+   .org-row     → fork orizzontale con N figli
+   .org-col     → singolo figlio nel fork (stelo verticale verso l'alto)
+   .conn-v-down → linea verticale standalone verso il basso (sotto la card)
+   ============================================================ */
+.org-row {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 1rem;
+  padding-top: 28px;
+}
+.org-row::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  height: 2px;
+  background: var(--color-border);
+  /* Estende la linea orizzontale solo dal centro del primo al centro dell'ultimo figlio */
+  left: calc((1 / (var(--n, 1) * 2)) * 100%);
+  right: calc((1 / (var(--n, 1) * 2)) * 100%);
+  border-radius: 1px;
+}
+/* Se c'è un solo figlio, la linea orizzontale è invisibile (left=right=50%) */
+.org-row[data-n="1"]::before { display: none; }
+
+.org-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.org-col::before {
+  content: '';
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 28px;
+  background: var(--color-border);
+}
+
+.conn-v-down {
+  width: 2px;
+  height: 22px;
+  margin: 0 auto;
+  background: var(--color-border);
+}

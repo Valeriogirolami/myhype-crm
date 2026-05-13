@@ -1,0 +1,16 @@
+# ============================================================================
+# Supabase project config — MyHype
+#
+# Per ora ci serve solo configurare le 2 Edge Function: disabilitiamo
+# la verifica JWT AUTOMATICA del runtime Supabase (che dà errore con i nuovi
+# JWT firmati ES256) e la facciamo noi manualmente dentro la function via
+# fetch diretto all'endpoint /auth/v1/user.
+# ============================================================================
+
+project_id = "uinubzveewvotqovysgd"
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.update-user-password]
+verify_jwt = false
