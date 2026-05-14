@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Eye, EyeOff, KeyRound, RefreshCw } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, RefreshCw, Trash2 } from 'lucide-react'
 import Dialog from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -22,7 +22,7 @@ import Select from '@/components/ui/Select'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
-import { createUser, updateUserPassword } from '@/lib/edgeFunctions'
+import { createUser, updateUserPassword, deleteUser } from '@/lib/edgeFunctions'
 
 const RUOLI = [
   { v: 'admin', l: 'Admin' },
@@ -86,6 +86,10 @@ export default function UtenteDialog({
   const [resetMode, setResetMode] = useState(false)
   const [newPwd, setNewPwd] = useState('')
   const [resetting, setResetting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // Sicurezza: non posso eliminare me stesso
+  const isMe = isEdit && utente?.id === chiamante?.id
 
   const schema = isEdit ? schemaModifica : schemaCrea
 
@@ -195,6 +199,37 @@ export default function UtenteDialog({
     }
   }
 
+  /**
+   * Elimina completamente l'account (Admin/BO). Cancella auth.users
+   * → CASCADE su public.utenti. Le anagrafiche collegate (collaboratore/PdV)
+   * restano ma con account_id azzerato.
+   */
+  async function handleElimina() {
+    if (!utente?.id) return
+    const nomeCompleto = `${utente.nome || ''} ${utente.cognome || ''}`.trim()
+    const conferma = window.confirm(
+      `Vuoi eliminare DEFINITIVAMENTE l'account?\n\n` +
+      `Utente: ${nomeCompleto}\n` +
+      `Email: ${utente.email}\n` +
+      `Ruolo: ${utente.ruolo}\n\n` +
+      `⚠️ L'utente non potrà più accedere. Le anagrafiche eventualmente collegate (PdV / Collaboratore) restano ma vengono scollegate dall'account.\n` +
+      `L'operazione è IRREVERSIBILE.`
+    )
+    if (!conferma) return
+
+    setDeleting(true)
+    try {
+      await deleteUser({ user_id: utente.id })
+      toast.success('Account eliminato.')
+      onSaved?.()
+      onClose?.()
+    } catch (err) {
+      toast.error(`Errore: ${err.message}`)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   async function handleResetPassword() {
     if (newPwd.length < 8) {
       toast.error('La password deve avere almeno 8 caratteri.')
@@ -230,6 +265,12 @@ export default function UtenteDialog({
       }
       footer={
         <>
+          {/* Elimina account — solo in modalità modifica, mai per se stessi né per Admin se BO */}
+          {isEdit && !bloccatoPerNoAdmin && !isMe && (
+            <Button variant="danger" onClick={handleElimina} loading={deleting}>
+              <Trash2 size={14} /> Elimina
+            </Button>
+          )}
           <Button variant="secondary" onClick={onClose}>
             {isEdit ? 'Chiudi' : 'Annulla'}
           </Button>

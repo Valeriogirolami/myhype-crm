@@ -52,3 +52,17 @@ export async function updateUserPassword({ user_id, new_password }) {
   if (data?.error) throw new Error(data.error)
   return data
 }
+
+/**
+ * Elimina completamente un account utente (Admin/BO).
+ * Anagrafiche collegate (pdv.account_id, collaboratori.account_id) restano
+ * ma con account_id azzerato (ON DELETE SET NULL).
+ */
+export async function deleteUser({ user_id }) {
+  const { data, error } = await supabase.functions.invoke('delete-user', {
+    body: { user_id },
+  })
+  if (error) throw new Error(await estraiErroreDettagliato(error))
+  if (data?.error) throw new Error(data.error)
+  return data
+}
