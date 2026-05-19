@@ -351,6 +351,7 @@ function formatMotivo(motivo, tipoKo) {
     non_trovato: 'Non trovato',
     documenti_non_validi: 'Documenti non validi',
     manca_firma: 'Manca firma',
+    manca_modulo_avvenuto_contatto: 'Manca modulo avvenuto contatto',
     rifiuto_cliente: 'Rifiuto cliente',
     ko_tecnico: 'KO tecnico',
     ko_credito: 'KO credito',

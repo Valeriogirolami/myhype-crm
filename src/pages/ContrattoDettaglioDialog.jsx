@@ -105,6 +105,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       motivo_ko: data.motivo_ko || '',
       note_ko: data.note_ko || '',
       note: data.note || '',
+      note_bo: data.note_bo || '',
       mese_gettonamento: dateToYM(data.mese_gettonamento),
       mese_storno: dateToYM(data.mese_storno),
       venditore_id: data.venditore?.id || '',
@@ -403,6 +404,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       const updates = {
         stato: nuovoStato,
         note: form.note?.trim() || null,
+        note_bo: form.note_bo?.trim() || null,
         venditore_id: form.venditore_id || null,
         prodotto: form.prodotto,
         motivo_ko_non_validato: null,
@@ -743,6 +745,13 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                 </InfoBlock>
               )}
 
+              {/* Note Back office (lettura: tutti — scrittura: solo Admin/BO) */}
+              {data.note_bo && (
+                <InfoBlock icon={Notebook} label="Note Back office">
+                  <p className="whitespace-pre-wrap text-sm text-white">{data.note_bo}</p>
+                </InfoBlock>
+              )}
+
               {/* === AZIONI RAPIDE ===
                    - Admin/BO: tutti i bottoni in base allo stato
                    - PdV proprietario: SOLO "Reinserisci" se contratto in KO non validato (§4.7) */}
@@ -791,6 +800,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                     <option value="non_trovato">Non trovato</option>
                     <option value="documenti_non_validi">Documenti non validi</option>
                     <option value="manca_firma">Manca firma</option>
+                    <option value="manca_modulo_avvenuto_contatto">Manca modulo avvenuto contatto</option>
                   </Select>
                 )}
 
@@ -837,6 +847,13 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                 </Select>
 
                 <Textarea label="Note (generali)" value={form.note} onChange={v => setF('note', v)} />
+
+                <Textarea
+                  label="Note Back office"
+                  hint="Visibile a tutti, modificabile solo da Admin/BO"
+                  value={form.note_bo}
+                  onChange={v => setF('note_bo', v)}
+                />
               </SezioneEdit>
 
               {/* Sezione 2: Cliente */}
@@ -1223,6 +1240,7 @@ function labelMotivoKoNonVal(k) {
     non_trovato: 'Non trovato',
     documenti_non_validi: 'Documenti non validi',
     manca_firma: 'Manca firma',
+    manca_modulo_avvenuto_contatto: 'Manca modulo avvenuto contatto',
   })[k] || k
 }
 
@@ -1256,6 +1274,7 @@ function emptyForm() {
     motivo_ko: '',
     note_ko: '',
     note: '',
+    note_bo: '',
     mese_gettonamento: '',
     mese_storno: '',
     venditore_id: '',

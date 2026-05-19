@@ -192,7 +192,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
     const t = setTimeout(async () => {
       const { data } = await supabase
         .from('clienti')
-        .select('id, nome, cognome, ragione_sociale, categoria, codice_fiscale, email, telefono, telefono_fisso, iban, pod, pdr')
+        .select('id, nome, cognome, ragione_sociale, categoria, codice_fiscale, email, telefono, telefono_fisso, iban, pod, pdr, codice_contratto')
         .ilike('codice_fiscale', cf)
       setDuplicatiCF(data || [])
     }, 400)
@@ -241,6 +241,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
       iban: c.iban || '',
       pod: c.pod || '',
       pdr: c.pdr || '',
+      codice_contratto: c.codice_contratto || '',
     })
     setDuplicatiCF([])
     toast.success(`Userai i dati del cliente esistente: ${nomeCliente(c)}`)
@@ -289,6 +290,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           iban: cliente.iban || null,
           pod: cliente.pod || null,
           pdr: cliente.pdr || null,
+          codice_contratto: cliente.codice_contratto || null,
         }
         const { data: nuovo, error: errCli } = await supabase
           .from('clienti')
@@ -310,6 +312,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           iban: nuovo.iban || '',
           pod: nuovo.pod || '',
           pdr: nuovo.pdr || '',
+          codice_contratto: nuovo.codice_contratto || '',
         }
       }
 
@@ -588,6 +591,8 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
 
             <Input label="POD (solo Energia)" hint="Opzionale" value={cliente.pod} onChange={e => set('pod', e.target.value)} disabled={!!clienteEsistenteId} />
             <Input label="PDR (solo Gas)"      hint="Opzionale" value={cliente.pdr} onChange={e => set('pdr', e.target.value)} disabled={!!clienteEsistenteId} />
+
+            <Input label="Codice Contratto" hint="Opzionale — campo libero" value={cliente.codice_contratto} onChange={e => set('codice_contratto', e.target.value)} disabled={!!clienteEsistenteId} />
           </div>
 
           {!clienteEsistenteId && duplicati.length > 0 && (
@@ -888,5 +893,6 @@ function emptyCliente() {
     iban: '',
     pod: '',
     pdr: '',
+    codice_contratto: '',
   }
 }

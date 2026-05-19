@@ -25,7 +25,7 @@ create type stato_contratto as enum (
   'da_validare','ko_non_validato','validato','ko','gettonato','stornato'
 );
 create type motivo_ko_non_validato as enum (
-  'non_trovato','documenti_non_validi','manca_firma'
+  'non_trovato','documenti_non_validi','manca_firma','manca_modulo_avvenuto_contatto'
 );
 create type motivo_ko as enum (
   'rifiuto_cliente','ko_tecnico','ko_credito','ko_altro'
@@ -133,6 +133,7 @@ create table public.clienti (
   iban             text not null,
   pod              text,                       -- solo se energia
   pdr              text,                       -- solo se gas/energia (variante)
+  codice_contratto text,                       -- campo libero (es. codice contratto fornitore)
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
@@ -189,6 +190,7 @@ create table public.contratti (
   punti_snap              integer,
 
   note                    text,
+  note_bo                 text,                          -- note del Back office (lettura tutti, scrittura solo admin/bo via RLS)
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now(),
 

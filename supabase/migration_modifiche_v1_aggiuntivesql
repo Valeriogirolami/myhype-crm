@@ -1,0 +1,24 @@
+-- ============================================================================
+-- MyHype — Migrazione: 3 modifiche aggiuntive (v1.x)
+-- ============================================================================
+-- 1) Aggiunge un nuovo valore all'enum motivo_ko_non_validato:
+--    'manca_modulo_avvenuto_contatto'
+-- 2) Aggiunge la colonna note_bo (text) alla tabella contratti.
+--    Lettura: tutti gli utenti loggati (policy "contratti_read_authenticated" già attiva).
+--    Scrittura: solo admin/bo (policy "contratti_update_admin_bo" già attiva).
+-- 3) Aggiunge la colonna codice_contratto (text) alla tabella clienti.
+--    Campo libero, opzionale.
+-- ============================================================================
+
+-- --- 1) Nuovo motivo KO non validato ---------------------------------------
+-- (in Postgres ALTER TYPE ... ADD VALUE non si può fare dentro a una transazione;
+-- esegui questa riga DA SOLA se l'editor SQL ti dà errore di transazione)
+alter type motivo_ko_non_validato add value if not exists 'manca_modulo_avvenuto_contatto';
+
+-- --- 2) Note Back office su contratti --------------------------------------
+alter table public.contratti
+  add column if not exists note_bo text;
+
+-- --- 3) Codice Contratto (campo libero) su clienti ------------------------
+alter table public.clienti
+  add column if not exists codice_contratto text;

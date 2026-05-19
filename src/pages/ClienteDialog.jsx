@@ -88,6 +88,7 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
       iban: data.iban || '',
       pod: data.pod || '',
       pdr: data.pdr || '',
+      codice_contratto: data.codice_contratto || '',
     })
   }, [editing, data])
 
@@ -138,6 +139,7 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
         iban: form.iban.trim() || null,
         pod: form.pod.trim() || null,
         pdr: form.pdr.trim() || null,
+        codice_contratto: form.codice_contratto.trim() || null,
       }
       const { error } = await supabase
         .from('clienti').update(payload).eq('id', clienteId)
@@ -286,6 +288,11 @@ function ViewCliente({ data, contratti, stats }) {
             </div>
           )}
         </Info>
+        <div className="sm:col-span-2">
+          <Info icon={FileText} label="Codice Contratto">
+            <div className="text-white tabular-nums break-all">{data.codice_contratto || <span className="text-text-muted">—</span>}</div>
+          </Info>
+        </div>
       </div>
 
       {/* Storico contratti */}
@@ -366,6 +373,10 @@ function FormCliente({ form, setF }) {
 
         <Input label="POD (Energia)" hint="Opzionale" value={form.pod} onChange={e => setF('pod', e.target.value)} />
         <Input label="PDR (Gas)" hint="Opzionale" value={form.pdr} onChange={e => setF('pdr', e.target.value)} />
+
+        <div className="sm:col-span-2">
+          <Input label="Codice Contratto" hint="Campo libero" value={form.codice_contratto} onChange={e => setF('codice_contratto', e.target.value)} />
+        </div>
       </div>
     </div>
   )
