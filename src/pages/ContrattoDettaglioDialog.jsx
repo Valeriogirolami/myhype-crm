@@ -60,6 +60,10 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
   // Stato delete contratto (+ eventuale cliente orfano)
   const [deleting, setDeleting] = useState(false)
 
+  // Stato inline-edit di "Note Back office" (sempre visibile, salvataggio rapido)
+  const [noteBoDraft, setNoteBoDraft] = useState('')
+  const [savingNoteBo, setSavingNoteBo] = useState(false)
+
   // Liste ausiliarie per i select in modalità edit
   const [personeDisp, setPersoneDisp] = useState([])      // per "venditore"
   const [sottoprodottiDisp, setSottoprodottiDisp] = useState([]) // per cambio prodotto
@@ -83,8 +87,29 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       .single()
     if (error) console.error('[contratto] fetch errore:', error.message)
     setData(data)
+    setNoteBoDraft(data?.note_bo || '')
     setLoading(false)
   }, [contrattoId])
+
+  async function salvaNoteBo() {
+    if (!data) return
+    setSavingNoteBo(true)
+    try {
+      const valore = noteBoDraft.trim() || null
+      const { error } = await supabase
+        .from('contratti')
+        .update({ note_bo: valore })
+        .eq('id', data.id)
+      if (error) throw error
+      setData(prev => ({ ...prev, note_bo: valore }))
+      toast.success('Note Back office salvate.')
+      onUpdated?.()
+    } catch (err) {
+      toast.error(`Errore: ${err.message}`)
+    } finally {
+      setSavingNoteBo(false)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -745,12 +770,39 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                 </InfoBlock>
               )}
 
-              {/* Note Back office (lettura: tutti — scrittura: solo Admin/BO) */}
-              {data.note_bo && (
-                <InfoBlock icon={Notebook} label="Note Back office">
-                  <p className="whitespace-pre-wrap text-sm text-white">{data.note_bo}</p>
-                </InfoBlock>
-              )}
+              {/* Note Back office — sempre visibile.
+                  Lettura: tutti. Scrittura+Salva inline: solo Admin/BO. */}
+              <div className="rounded-xl border border-border bg-bg/30 p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wider text-text-muted">
+                  <Notebook size={12} /> Note Back office
+                </div>
+                {isBoAdmin ? (
+                  <>
+                    <textarea
+                      value={noteBoDraft}
+                      onChange={e => setNoteBoDraft(e.target.value)}
+                      rows={3}
+                      placeholder="Scrivi qui le note del Back office…"
+                      className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-white outline-none focus:border-accent"
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="text-xs text-text-muted">Visibile a tutti, modificabile solo da Admin/BO.</p>
+                      <Button
+                        size="sm"
+                        onClick={salvaNoteBo}
+                        loading={savingNoteBo}
+                        disabled={(noteBoDraft || '') === (data.note_bo || '')}
+                      >
+                        <Save size={14} /> Salva nota
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm text-white">
+                    {data.note_bo || <span className="text-text-muted">Nessuna nota.</span>}
+                  </p>
+                )}
+              </div>
 
               {/* === AZIONI RAPIDE ===
                    - Admin/BO: tutti i bottoni in base allo stato
