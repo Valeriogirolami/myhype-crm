@@ -1108,6 +1108,7 @@ function PannelloAzioneRapida({ action, data: d, set, loading, onConferma, onAnn
           <option value="non_trovato">Non trovato</option>
           <option value="documenti_non_validi">Documenti non validi</option>
           <option value="manca_firma">Manca firma</option>
+          <option value="manca_modulo_avvenuto_contatto">Manca modulo avvenuto contatto</option>
         </Select>
       )}
 
