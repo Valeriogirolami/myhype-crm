@@ -6,7 +6,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   Home, FileText, Users, Store, UserCog, BarChart3, Target,
-  Trophy, Package, Network, Settings,
+  Trophy, Package, Network, Settings, X,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import HypeLogo from './HypeLogo'
@@ -33,56 +33,80 @@ const items = [
   { to: '/admin',        label: 'Admin',         icon: Settings, roles: ['admin','bo'] },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onClose }) {
   const { profile } = useAuth()
   const ruolo = profile?.ruolo
 
   const visibili = items.filter(i => !i.roles || i.roles.includes(ruolo))
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface">
-      {/* Header con logo */}
-      <div className="flex h-16 items-center px-5">
-        <HypeLogo size={28} />
-      </div>
+    <>
+      {/* Overlay scuro dietro al drawer — solo mobile, chiude al tap */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Voci di navigazione */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          {visibili.map(({ to, label, icon: Icon }) => (
-            <li key={to}>
-              <NavLink to={to} end={to === '/'}>
-                {({ isActive }) => (
-                  <div
-                    className={cn(
-                      'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
-                      isActive
-                        ? 'bg-accent/15 text-white'
-                        : 'text-text-muted hover:bg-white/5 hover:text-white',
-                    )}
-                  >
-                    {/* Barra laterale di attivo */}
-                    {isActive && (
-                      <motion.span
-                        layoutId="sidebar-active"
-                        className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-gradient-primary"
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      />
-                    )}
-                    <Icon size={18} strokeWidth={2} />
-                    <span className="font-medium">{label}</span>
-                  </div>
-                )}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 ease-out',
+          'md:relative md:z-auto md:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
+        {/* Header con logo + chiusura (X solo su mobile) */}
+        <div className="flex h-16 items-center justify-between px-5">
+          <HypeLogo size={28} />
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-white/5 hover:text-white md:hidden"
+            aria-label="Chiudi menu"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-      {/* Footer sidebar: versione */}
-      <div className="border-t border-border px-5 py-3 text-xs text-text-muted">
-        MyHype v0.1 — Aprile 2026
-      </div>
-    </aside>
+        {/* Voci di navigazione */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <ul className="space-y-1">
+            {visibili.map(({ to, label, icon: Icon }) => (
+              <li key={to}>
+                <NavLink to={to} end={to === '/'} onClick={onClose}>
+                  {({ isActive }) => (
+                    <div
+                      className={cn(
+                        'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
+                        isActive
+                          ? 'bg-accent/15 text-white'
+                          : 'text-text-muted hover:bg-white/5 hover:text-white',
+                      )}
+                    >
+                      {/* Barra laterale di attivo */}
+                      {isActive && (
+                        <motion.span
+                          layoutId="sidebar-active"
+                          className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-gradient-primary"
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        />
+                      )}
+                      <Icon size={18} strokeWidth={2} />
+                      <span className="font-medium">{label}</span>
+                    </div>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* Footer sidebar: versione */}
+        <div className="border-t border-border px-5 py-3 text-xs text-text-muted">
+          MyHype v0.1 — Aprile 2026
+        </div>
+      </aside>
+    </>
   )
 }

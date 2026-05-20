@@ -5,7 +5,7 @@
  * direttamente il dialog di creazione contratto.
  */
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Plus, LogOut } from 'lucide-react'
+import { ChevronDown, Plus, LogOut, Menu } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import ContrattoNuovoDialog from '@/pages/ContrattoNuovoDialog'
@@ -25,7 +25,7 @@ const etichettaRuolo = {
   pdv: 'Punto Vendita',
 }
 
-export default function TopBar() {
+export default function TopBar({ onOpenMenu }) {
   const { profile, signOut } = useAuth()
   const [openMenu, setOpenMenu] = useState(false)
   const [newContrattoOpen, setNewContrattoOpen] = useState(false)
@@ -52,12 +52,21 @@ export default function TopBar() {
   const isPdv = profile?.ruolo === 'pdv'
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur">
-      <div />
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 backdrop-blur md:px-6">
+      {/* Sinistra: hamburger (solo mobile) per aprire la sidebar */}
+      <div className="flex items-center">
+        <button
+          onClick={onOpenMenu}
+          className="rounded-lg p-2 text-text-muted transition-colors hover:bg-white/5 hover:text-white md:hidden"
+          aria-label="Apri menu"
+        >
+          <Menu size={22} />
+        </button>
+      </div>
 
       {/* Centro: filtro periodo globale */}
-      <div className="flex items-center gap-2 rounded-full border border-border bg-bg px-4 py-1.5 text-sm">
-        <span className="text-text-muted">Periodo:</span>
+      <div className="flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1.5 text-sm md:px-4">
+        <span className="hidden text-text-muted sm:inline">Periodo:</span>
         <button className="flex items-center gap-1 font-medium text-white transition-colors hover:text-accent-2">
           {meseCorrente} {annoCorrente}
           <ChevronDown size={14} />
@@ -65,15 +74,15 @@ export default function TopBar() {
       </div>
 
       {/* Destra */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         {/* CTA nuovo contratto — solo PdV (§9.2) */}
         {isPdv && (
           <button
             onClick={() => setNewContrattoOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:brightness-110"
+            className="flex items-center gap-2 rounded-xl bg-gradient-primary px-3 py-2 text-sm font-semibold text-white shadow-soft transition hover:brightness-110 md:px-4"
           >
             <Plus size={16} />
-            Nuovo contratto
+            <span className="hidden sm:inline">Nuovo contratto</span>
           </button>
         )}
 
