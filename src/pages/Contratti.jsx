@@ -10,7 +10,10 @@
  * - Auto-refresh dopo ogni azione di stato
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Loader2, FileText, Filter, Calendar, Coins } from 'lucide-react'
+import {
+  Plus, Search, Loader2, FileText, Filter, Calendar, Coins,
+  Download, Database, ChevronLeft, ChevronRight,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
@@ -23,11 +26,15 @@ import ContrattoNuovoDialog from './ContrattoNuovoDialog'
 import ContrattoDettaglioDialog from './ContrattoDettaglioDialog'
 import GettonaMultipliDialog from './GettonaMultipliDialog'
 import { getPdvScopeIds } from '@/lib/classifiche'
+import { scaricaXlsx, esportaDatabaseCompleto } from '@/lib/export'
+
+const OPZIONI_PAGINA = [10, 25, 100, 'tutti']
 
 export default function Contratti() {
   const { profile } = useAuth()
   const canCreate = ['admin','bo','pdv'].includes(profile?.ruolo)
   const isBoAdmin = ['admin','bo'].includes(profile?.ruolo)
+  const isAdmin = profile?.ruolo === 'admin'
   const isPdv = profile?.ruolo === 'pdv'
   const isAsTm = ['as','tm'].includes(profile?.ruolo)
 
@@ -51,6 +58,13 @@ export default function Contratti() {
 
   // Multi-selezione
   const [selezionati, setSelezionati] = useState(new Set())
+
+  // Paginazione (client-side): default 10 righe per pagina
+  const [pageSize, setPageSize] = useState(10)   // numero | 'tutti'
+  const [page, setPage] = useState(1)
+
+  // Export in corso (per disabilitare i bottoni)
+  const [exporting, setExporting] = useState(false)
 
   // Dialog
   const [newOpen, setNewOpen] = useState(false)
@@ -159,6 +173,81 @@ export default function Contratti() {
   }, [rows, search, filterStato, filterPdv, filterArea, filterProdotto,
       dateFrom, dateTo, filterMeseGettona])
 
+  // --- Paginazione client-side ---
+  const totalePagine = pageSize === 'tutti'
+    ? 1
+    : Math.max(1, Math.ceil(filtered.length / pageSize))
+
+  // Se cambiano i filtri o la dimensione pagina, torno alla pagina 1
+  useEffect(() => { setPage(1) }, [
+    search, filterStato, filterPdv, filterArea, filterProdotto,
+    dateFrom, dateTo, filterMeseGettona, pageSize,
+  ])
+
+  // Se la pagina corrente eccede il totale (es. dopo un filtro), la riallineo
+  useEffect(() => {
+    if (page > totalePagine) setPage(totalePagine)
+  }, [page, totalePagine])
+
+  const paginati = useMemo(() => {
+    if (pageSize === 'tutti') return filtered
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  // --- Export Excel ---
+  function rigaExport(r) {
+    const sp = (r.contratto_sottoprodotti || []).map(x => x.sottoprodotti).filter(Boolean)
+    const t = calcolaTotali(sp)
+    const punti = r.stato === 'gettonato' ? (r.punti_snap ?? t.punti) : t.punti
+    const fatt  = r.stato === 'gettonato' ? (r.fatturato_pdv_snap ?? t.fatturato_pdv) : t.fatturato_pdv
+    return {
+      'Data sottoscrizione': formatDate(r.data_sottoscrizione),
+      'Cliente': nomeCliente(r.cliente),
+      'Codice Fiscale': r.cliente?.codice_fiscale || '',
+      'Categoria': r.cliente?.categoria === 'azienda' ? 'Azienda' : 'Privato',
+      'PdV': r.pdv?.nome || '',
+      'Area': r.pdv?.area ?? '',
+      'Venditore': r.venditore ? `${r.venditore.nome} ${r.venditore.cognome}` : '',
+      'Prodotto': PRODOTTI[r.prodotto]?.label || r.prodotto,
+      'Punti': punti,
+      'Fatturato PdV (€)': fatt,
+      'Stato': STATI[r.stato]?.label || r.stato,
+      'Mese gettonamento': r.mese_gettonamento ? formatYM(r.mese_gettonamento) : '',
+      'Mese storno': r.mese_storno ? formatYM(r.mese_storno) : '',
+      'Note': r.note || '',
+    }
+  }
+
+  async function esportaFiltrati() {
+    if (filtered.length === 0) {
+      toast.error('Nessun contratto da esportare con i filtri attuali.')
+      return
+    }
+    try {
+      setExporting(true)
+      await scaricaXlsx([{ nome: 'Contratti', righe: filtered.map(rigaExport) }], 'MyHype_contratti')
+      toast.success(`Esportati ${filtered.length} contratti.`)
+    } catch (err) {
+      toast.error(`Errore export: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function esportaTutto() {
+    try {
+      setExporting(true)
+      toast.info('Preparazione export completo… può richiedere qualche secondo.')
+      const n = await esportaDatabaseCompleto()
+      toast.success(`Export completo pronto (${n} righe totali).`)
+    } catch (err) {
+      toast.error(`Errore export totale: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // Solo i validati possono essere selezionati (per gettonamento massivo)
   const selezionabiliVisibili = useMemo(
     () => filtered.filter(r => r.stato === 'validato'),
@@ -199,12 +288,28 @@ export default function Contratti() {
             {rows.length === 1 ? 'contratto' : 'contratti'}
           </p>
         </div>
-        {canCreate && (
-          <Button onClick={() => setNewOpen(true)}>
-            <Plus size={16} />
-            Nuovo contratto
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* Export Excel del filtrato — solo Admin/BO */}
+          {isBoAdmin && (
+            <Button variant="secondary" onClick={esportaFiltrati} loading={exporting}>
+              <Download size={16} />
+              Esporta Excel
+            </Button>
+          )}
+          {/* Export totale database — solo Admin */}
+          {isAdmin && (
+            <Button variant="secondary" onClick={esportaTutto} loading={exporting}>
+              <Database size={16} />
+              Esporta tutto
+            </Button>
+          )}
+          {canCreate && (
+            <Button onClick={() => setNewOpen(true)}>
+              <Plus size={16} />
+              Nuovo contratto
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Barra filtri */}
@@ -301,6 +406,7 @@ export default function Contratti() {
             )}
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -331,7 +437,7 @@ export default function Contratti() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(r => {
+                {paginati.map(r => {
                   const sp = (r.contratto_sottoprodotti || []).map(x => x.sottoprodotti).filter(Boolean)
                   const t = calcolaTotali(sp)
                   const statoMeta    = STATI[r.stato]
@@ -398,6 +504,60 @@ export default function Contratti() {
               </tbody>
             </table>
           </div>
+
+          {/* Barra paginazione */}
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm sm:flex-row">
+            <div className="flex items-center gap-2 text-text-muted">
+              <span>Mostra:</span>
+              <select
+                value={String(pageSize)}
+                onChange={e => {
+                  const v = e.target.value
+                  setPageSize(v === 'tutti' ? 'tutti' : Number(v))
+                }}
+                className="rounded-lg border border-border bg-bg px-2 py-1 text-white outline-none focus:border-accent"
+              >
+                {OPZIONI_PAGINA.map(o => (
+                  <option key={o} value={String(o)} className="bg-surface">
+                    {o === 'tutti' ? 'Tutti' : o}
+                  </option>
+                ))}
+              </select>
+              <span className="hidden sm:inline">per pagina</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-text-muted">
+                {pageSize === 'tutti'
+                  ? `${filtered.length} contratti`
+                  : `${filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}–${Math.min(page * pageSize, filtered.length)} di ${filtered.length}`}
+              </span>
+              {pageSize !== 'tutti' && totalePagine > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="rounded-lg border border-border bg-bg p-1.5 text-white transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Pagina precedente"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="min-w-[5.5rem] text-center text-text-muted">
+                    Pag. {page} di {totalePagine}
+                  </span>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalePagine, p + 1))}
+                    disabled={page >= totalePagine}
+                    className="rounded-lg border border-border bg-bg p-1.5 text-white transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Pagina successiva"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          </>
         )}
       </div>
 
