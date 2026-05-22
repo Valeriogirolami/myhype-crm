@@ -17,6 +17,7 @@ import Clienti from './pages/Clienti'
 import Target from './pages/Target'
 import Classifiche from './pages/Classifiche'
 import GaraGallery from './pages/GaraGallery'
+import Simulatore from './pages/Simulatore'
 import Organigramma from './pages/Organigramma'
 import Admin from './pages/Admin'
 import Placeholder from './pages/Placeholder'
@@ -55,10 +56,11 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Area Gara Gallery — solo Admin (§11) */}
+          {/* Area Gara Gallery + Simulatore — solo Admin (§11) */}
           <Route element={<ProtectedRoute roles={['admin']} />}>
             <Route element={<Layout />}>
               <Route path="gara-gallery" element={<GaraGallery />} />
+              <Route path="simulatore"   element={<Simulatore />} />
             </Route>
           </Route>
 

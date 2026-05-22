@@ -6,7 +6,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   Home, FileText, Users, Store, UserCog, BarChart3, Target,
-  Trophy, Package, Network, Settings, X,
+  Trophy, Package, Network, Settings, X, Calculator,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import HypeLogo from './HypeLogo'
@@ -28,6 +28,7 @@ const items = [
   { to: '/classifiche',  label: 'Classifiche',   icon: BarChart3 },
   { to: '/target',       label: 'Target',        icon: Target },
   { to: '/gara-gallery', label: 'Gara Gallery',  icon: Trophy,   roles: ['admin'] }, // solo admin (§11)
+  { to: '/simulatore',   label: 'Simulatore',    icon: Calculator, roles: ['admin'] }, // solo admin
   { to: '/prodotti',     label: 'Prodotti',      icon: Package,  roles: ['admin','bo'] },
   { to: '/organigramma', label: 'Organigramma',  icon: Network },
   { to: '/admin',        label: 'Admin',         icon: Settings, roles: ['admin','bo'] },

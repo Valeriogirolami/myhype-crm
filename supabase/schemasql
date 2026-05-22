@@ -292,6 +292,36 @@ create table public.notifiche (
 create index idx_notifiche_dest on public.notifiche(destinatario, letta);
 
 -- ============================================================================
+-- 12. SIMULATORE PARAMETRI (Simulatore di Sostenibilità — solo Admin)
+-- Tabella singleton (1 sola riga, id=1) con i parametri economici di sistema.
+-- RLS: solo admin (vedi migration_simulatore_parametrisql).
+-- ============================================================================
+
+create table public.simulatore_parametri (
+  id integer primary key default 1 check (id = 1),
+  perc_mobile      numeric not null default 65,
+  perc_fisso       numeric not null default 30,
+  perc_energia     numeric not null default 5,
+  punti_mobile     numeric not null default 5,
+  punti_fisso      numeric not null default 12,
+  punti_energia    numeric not null default 5,
+  fatt_az_mobile   numeric not null default 35,
+  fatt_az_fisso    numeric not null default 165,
+  fatt_az_energia  numeric not null default 100,
+  fatt_pdv_mobile  numeric not null default 12,
+  fatt_pdv_fisso   numeric not null default 45,
+  fatt_pdv_energia numeric not null default 15,
+  fisso_venditore  numeric not null default 0,
+  stipendio_as     numeric not null default 2500,
+  stipendio_dv     numeric not null default 5000,
+  costo_recruiting numeric not null default 0,
+  costo_back_office numeric not null default 0,
+  costo_ufficio    numeric not null default 0,
+  updated_at  timestamptz not null default now(),
+  updated_by  uuid references auth.users(id)
+);
+
+-- ============================================================================
 -- TRIGGER: aggiornamento automatico updated_at
 -- ============================================================================
 
