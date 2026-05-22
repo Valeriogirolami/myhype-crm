@@ -91,6 +91,8 @@ export function simula(N, modalita, p, input, soglieGalleria) {
   return {
     n_mobile, n_fisso, n_energia, punti_totali,
     fatt_azienda, gara_gallery, soglia, ricavi_totali,
+    // Dettaglio costi (per il riepilogo voce per voce)
+    affitto: input.affitto,
     fatt_pdv, costo_fisso_vend, costo_manager, costo_aziendale, costi_totali,
     margine,
   }

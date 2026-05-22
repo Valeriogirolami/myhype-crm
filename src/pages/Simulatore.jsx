@@ -362,6 +362,27 @@ function ColonnaModalita({ titolo, sottotitolo, icona: Icona, tono, scenari, off
   )
 }
 
+// Riga "label ........ valore" per le voci di ricavo/costo
+function VoceCosto({ label, valore }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-text-muted">
+      <span>{label}</span>
+      <span className="text-white/80">{formatEuro(Math.round(valore))}</span>
+    </div>
+  )
+}
+
+// Riga di totale (in grassetto, eventualmente colorata)
+function VoceTotale({ label, valore, tono = 'white' }) {
+  const col = tono === 'success' ? 'text-success' : tono === 'danger' ? 'text-danger' : 'text-white'
+  return (
+    <div className="flex items-center justify-between gap-2 font-medium">
+      <span className={col}>{label}</span>
+      <span className={col}>{formatEuro(Math.round(valore))}</span>
+    </div>
+  )
+}
+
 function ScenarioCard({ meta, scenario, delay }) {
   const { icon: Icon } = meta
   const raggiungibile = scenario?.raggiungibile
@@ -399,16 +420,31 @@ function ScenarioCard({ meta, scenario, delay }) {
           </div>
 
           {/* Riepilogo economico */}
-          <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-text-muted tabular-nums">
-            <div>
-              Ricavi <span className="text-white">{formatEuro(Math.round(res.ricavi_totali))}</span>
-              {' · '}Costi <span className="text-white">{formatEuro(Math.round(res.costi_totali))}</span>
-              {' · '}Margine{' '}
-              <span className={res.margine >= 0 ? 'text-success' : 'text-danger'}>
-                {formatEuro(Math.round(res.margine))}
-              </span>
+          <div className="mt-2 space-y-2 border-t border-border pt-2 text-xs tabular-nums">
+            {/* Dettaglio ricavi */}
+            <div className="space-y-0.5">
+              <VoceCosto label="Fatturato Azienda" valore={res.fatt_azienda} />
+              <VoceCosto label="Premio Gara Gallery" valore={res.gara_gallery} />
+              <VoceTotale label="Ricavi totali" valore={res.ricavi_totali} tono="white" />
             </div>
-            <div className="flex items-center gap-1.5">
+
+            {/* Dettaglio costi (voce per voce) */}
+            <div className="space-y-0.5 border-t border-border/60 pt-2">
+              <VoceCosto label="Affitto centro" valore={res.affitto} />
+              <VoceCosto label="Fisso venditori" valore={res.costo_fisso_vend} />
+              <VoceCosto label="Provvigioni PdV" valore={res.fatt_pdv} />
+              <VoceCosto label="Manager (AS + DV)" valore={res.costo_manager} />
+              <VoceCosto label="Costi aziendali" valore={res.costo_aziendale} />
+              <VoceTotale label="Costi totali" valore={res.costi_totali} tono="white" />
+            </div>
+
+            {/* Margine */}
+            <div className="border-t border-border/60 pt-2">
+              <VoceTotale label="Margine" valore={res.margine} tono={res.margine >= 0 ? 'success' : 'danger'} />
+            </div>
+
+            {/* Soglia Gara Gallery */}
+            <div className="flex items-center gap-1.5 border-t border-border/60 pt-2 text-text-muted">
               <Trophy size={12} className={res.gara_gallery > 0 ? 'text-success' : 'text-text-muted'} />
               {res.soglia ? (
                 <span>
