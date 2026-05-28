@@ -35,6 +35,14 @@ const PRODOTTI = [
   { v: 'energia', l: 'Energia', color: '#F5B042' },
 ]
 
+// Mappa veloce prodotto → colore (usata nei KPI "Medie globali rete"
+// per dare alle card lo stesso colore dei grafici sopra).
+const PRODOTTI_COLOR = {
+  mobile:  '#2B6CFF',
+  fisso:   '#7A9BFF',
+  energia: '#F5B042',
+}
+
 export default function Home() {
   const { profile } = useAuth()
 
@@ -274,21 +282,40 @@ function HomeAdmin() {
                   Nessun contratto ancora nel mese
                 </div>
               ) : (
-                <div className="mt-4 h-56">
+                <div className="mt-4 h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={datiPie}
                         dataKey="value"
                         nameKey="name"
-                        innerRadius={50}
-                        outerRadius={80}
+                        innerRadius={55}
+                        outerRadius={85}
                         paddingAngle={3}
+                        // Mostra direttamente la percentuale fuori dalla fetta,
+                        // con una linea che la collega al settore.
+                        labelLine={{ stroke: '#A3ADC9', strokeWidth: 1 }}
+                        label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
                       >
                         {datiPie.map((d, i) => <Cell key={i} fill={d.color} />)}
                       </Pie>
-                      <Tooltip contentStyle={tooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        formatter={(value, name) => {
+                          const totale = datiPie.reduce((s, d) => s + d.value, 0)
+                          const pct = totale > 0 ? (value / totale * 100).toFixed(1) : 0
+                          return [`${formatInt(value)} contratti (${pct}%)`, name]
+                        }}
+                      />
+                      {/* Legenda con totale per prodotto a fianco al nome */}
+                      <Legend
+                        wrapperStyle={{ fontSize: 12 }}
+                        formatter={(value, entry) => (
+                          <span className="text-text-muted">
+                            {value} <span className="tabular-nums text-white">({entry.payload.value})</span>
+                          </span>
+                        )}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -357,79 +384,109 @@ function HomeAdmin() {
           {/* === Riga 4: Medie globali rete (solo Admin) ===
               KPI calcolati su TUTTI i contratti validi (validato/gettonato/stornato),
               indipendentemente dal mese, per avere il valore medio di
-              gettone (= fatturato azienda) e punti per ogni prodotto e cliente. */}
+              gettone (= fatturato azienda) e punti per ogni prodotto e cliente.
+              Colori: icone abbinate ai colori-prodotto del progetto
+              (Mobile #2B6CFF · Fisso #7A9BFF · Energia #F5B042) per coerenza
+              col bar chart "Andamento target" e con la donut "Distribuzione". */}
           {isAdmin && medie && (
-            <div className="mt-8">
-              <div className="mb-3 flex items-end justify-between">
-                <div>
-                  <h3 className="text-sm font-medium uppercase tracking-wider text-white">
-                    Medie globali rete
-                  </h3>
-                  <p className="mt-1 text-xs text-text-muted">
-                    Valori medi per contratto e per cliente, calcolati su tutti i contratti
-                    validi della rete ({formatInt(medie.nContratti)} contratti totali · {formatInt(medie.nClienti)} clienti distinti).
-                  </p>
+            <div className="mt-10">
+              {/* Header sezione, in stile coerente con gli altri box della home */}
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-2 border-b border-border pb-3">
+                <div className="flex items-center gap-3">
+                  {/* Barretta colorata di accento per separare visivamente la sezione */}
+                  <div className="h-7 w-1 rounded bg-gradient-to-b from-[#2B6CFF] via-[#7A9BFF] to-[#F5B042]" />
+                  <div>
+                    <h2 className="text-lg font-medium tracking-tight text-white">
+                      Medie globali rete
+                    </h2>
+                    <p className="mt-0.5 text-xs text-text-muted">
+                      Valori medi per contratto e per cliente, su tutti i contratti validi della rete
+                      ({formatInt(medie.nContratti)} contratti totali · {formatInt(medie.nClienti)} clienti distinti).
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Riga 1: gettone medio per prodotto */}
+              {/* --- Gettone medio per prodotto (fatturato azienda) --- */}
+              <SottoTitoloMedia
+                titolo="Gettone medio per contratto"
+                sottotitolo="Fatturato azienda medio per ogni contratto di quel prodotto"
+              />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <KpiCard
                   icon={Wifi}
-                  label="Media Gettone Fisso"
+                  accent={PRODOTTI_COLOR.fisso}
+                  label="Fisso"
                   value={formatEuro(medie.mediaGettoneFisso)}
                   hint={`su ${formatInt(medie.nContrattiFisso)} contratti Fisso`}
                 />
                 <KpiCard
                   icon={Smartphone}
-                  label="Media Gettone Mobile"
+                  accent={PRODOTTI_COLOR.mobile}
+                  label="Mobile"
                   value={formatEuro(medie.mediaGettoneMobile)}
                   hint={`su ${formatInt(medie.nContrattiMobile)} contratti Mobile`}
                 />
                 <KpiCard
                   icon={Zap}
-                  label="Media Gettone Energia"
+                  accent={PRODOTTI_COLOR.energia}
+                  label="Energia"
                   value={formatEuro(medie.mediaGettoneEnergia)}
                   hint={`su ${formatInt(medie.nContrattiEnergia)} contratti Energia`}
                 />
               </div>
 
-              {/* Riga 2: punti medi per prodotto */}
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <KpiCard
-                  icon={Wifi}
-                  label="Media Punti Fisso"
-                  value={formatInt(medie.mediaPuntiFisso)}
-                  hint={`su ${formatInt(medie.nContrattiFisso)} contratti Fisso`}
+              {/* --- Punti medi per prodotto --- */}
+              <div className="mt-6">
+                <SottoTitoloMedia
+                  titolo="Punti medi per contratto"
+                  sottotitolo="Punti generati in media per ogni contratto di quel prodotto"
                 />
-                <KpiCard
-                  icon={Smartphone}
-                  label="Media Punti Mobile"
-                  value={formatInt(medie.mediaPuntiMobile)}
-                  hint={`su ${formatInt(medie.nContrattiMobile)} contratti Mobile`}
-                />
-                <KpiCard
-                  icon={Zap}
-                  label="Media Punti Energia"
-                  value={formatInt(medie.mediaPuntiEnergia)}
-                  hint={`su ${formatInt(medie.nContrattiEnergia)} contratti Energia`}
-                />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <KpiCard
+                    icon={Wifi}
+                    accent={PRODOTTI_COLOR.fisso}
+                    label="Fisso"
+                    value={formatInt(medie.mediaPuntiFisso)}
+                    hint={`su ${formatInt(medie.nContrattiFisso)} contratti Fisso`}
+                  />
+                  <KpiCard
+                    icon={Smartphone}
+                    accent={PRODOTTI_COLOR.mobile}
+                    label="Mobile"
+                    value={formatInt(medie.mediaPuntiMobile)}
+                    hint={`su ${formatInt(medie.nContrattiMobile)} contratti Mobile`}
+                  />
+                  <KpiCard
+                    icon={Zap}
+                    accent={PRODOTTI_COLOR.energia}
+                    label="Energia"
+                    value={formatInt(medie.mediaPuntiEnergia)}
+                    hint={`su ${formatInt(medie.nContrattiEnergia)} contratti Energia`}
+                  />
+                </div>
               </div>
 
-              {/* Riga 3: medie per cliente */}
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <KpiCard
-                  icon={Users}
-                  label="Media punti per cliente"
-                  value={formatInt(medie.mediaPuntiCliente)}
-                  hint={`su ${formatInt(medie.nClienti)} clienti distinti`}
+              {/* --- Medie per cliente (totale generato / clienti distinti) --- */}
+              <div className="mt-6">
+                <SottoTitoloMedia
+                  titolo="Valore medio per cliente"
+                  sottotitolo={`Totale generato dalla rete diviso per ${formatInt(medie.nClienti)} clienti distinti`}
                 />
-                <KpiCard
-                  icon={Users}
-                  label="Media gettone per cliente"
-                  value={formatEuro(medie.mediaGettoneCliente)}
-                  hint={`fatturato azienda medio · ${formatInt(medie.nClienti)} clienti distinti`}
-                />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <KpiCard
+                    icon={Users}
+                    label="Punti per cliente"
+                    value={formatInt(medie.mediaPuntiCliente)}
+                    hint="Quanti punti in media porta un cliente"
+                  />
+                  <KpiCard
+                    icon={Users}
+                    label="Gettone per cliente"
+                    value={formatEuro(medie.mediaGettoneCliente)}
+                    hint="Fatturato azienda medio per cliente"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -441,16 +498,49 @@ function HomeAdmin() {
 
 // ---------- sub-componenti ----------
 
-function KpiCard({ icon: Icon, label, value, hint, tone = 'neutral' }) {
+// Intestazione di un sotto-blocco dentro "Medie globali rete".
+// Tiene allineato lo stile (titolo bianco + sottotitolo grigio + margine).
+function SottoTitoloMedia({ titolo, sottotitolo }) {
+  return (
+    <div className="mb-3">
+      <h3 className="text-sm font-medium uppercase tracking-wider text-white">
+        {titolo}
+      </h3>
+      {sottotitolo && (
+        <p className="mt-0.5 text-xs text-text-muted">{sottotitolo}</p>
+      )}
+    </div>
+  )
+}
+
+function KpiCard({ icon: Icon, label, value, hint, tone = 'neutral', accent }) {
   const valueColor =
     tone === 'success' ? 'text-success' :
     tone === 'danger'  ? 'text-danger'  :
                           'text-white'
+  // Se passo un colore "accent" custom (es. il colore di un prodotto)
+  // lo applico all'icona, al suo box di sfondo e al bordo hover.
+  const iconStyle = accent ? { color: accent } : undefined
+  const iconBoxStyle = accent ? { backgroundColor: `${accent}1A` } : undefined  // 1A = ~10% alpha
+  const borderHover = accent
+    ? { '--tw-hover-border': accent }
+    : undefined
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft transition hover:border-accent/40">
+    <div
+      className="group rounded-2xl border border-border bg-surface p-5 shadow-soft transition hover:border-accent/40"
+      style={accent ? { ...borderHover } : undefined}
+    >
       <div className="flex items-center justify-between">
         <span className="text-sm text-text-muted">{label}</span>
-        <Icon size={18} className="text-accent-2" />
+        <div
+          className={cn(
+            'flex h-9 w-9 items-center justify-center rounded-xl',
+            !accent && 'bg-accent/10',
+          )}
+          style={iconBoxStyle}
+        >
+          <Icon size={18} className={accent ? '' : 'text-accent-2'} style={iconStyle} />
+        </div>
       </div>
       <div className={cn('mt-4 text-3xl font-medium tabular-nums', valueColor)}>
         {value}
