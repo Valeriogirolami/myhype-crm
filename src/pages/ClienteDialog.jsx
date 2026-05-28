@@ -10,9 +10,10 @@
  *   nome, cognome, ragione_sociale, codice_fiscale, p_iva
  *   email, telefono, telefono_fisso, iban, pod, pdr
  */
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Loader2, Edit3, Save, X, User, FileText, Mail, Phone, CreditCard,
+  ChevronRight, ChevronDown, Package,
 } from 'lucide-react'
 import Dialog from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
@@ -49,7 +50,7 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
             id, prodotto, stato, data_sottoscrizione, mese_gettonamento, mese_storno,
             fatturato_pdv_snap, punti_snap,
             pdv:pdv(id, nome),
-            contratto_sottoprodotti(sottoprodotti(punti, fatturato_pdv))
+            contratto_sottoprodotti(sottoprodotti(id, nome, punti, fatturato_pdv))
           `)
           .eq('cliente_id', clienteId)
           .order('data_sottoscrizione', { ascending: false }),
@@ -225,6 +226,17 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
 // ---------- View ----------
 
 function ViewCliente({ data, contratti, stats }) {
+  // Tendina espandi/comprimi per vedere i sottoprodotti di ciascun contratto
+  const [aperti, setAperti] = useState(() => new Set())
+  function toggleAperto(id) {
+    setAperti(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   return (
     <div className="space-y-5">
       {/* Header con tipologia */}
@@ -306,6 +318,7 @@ function ViewCliente({ data, contratti, stats }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-text-muted">
+                <th className="w-8 px-2 py-2"></th>
                 <th className="px-4 py-2 font-medium">Data</th>
                 <th className="px-4 py-2 font-medium">PdV</th>
                 <th className="px-4 py-2 font-medium">Prodotto</th>
@@ -316,17 +329,56 @@ function ViewCliente({ data, contratti, stats }) {
               {contratti.map(c => {
                 const sm = STATI[c.stato]
                 const pm = PRODOTTI[c.prodotto]
+                // Estraggo i sottoprodotti del contratto (relazione N:M)
+                const sps = (c.contratto_sottoprodotti || []).map(r => r.sottoprodotti).filter(Boolean)
+                const isAperto = aperti.has(c.id)
                 return (
-                  <tr key={c.id} className="border-t border-border">
-                    <td className="px-4 py-2 text-text-muted tabular-nums">{formatDate(c.data_sottoscrizione)}</td>
-                    <td className="px-4 py-2 text-white">{c.pdv?.nome || '—'}</td>
-                    <td className="px-4 py-2">
-                      {pm && <Badge tone={pm.tone}>{pm.label}</Badge>}
-                    </td>
-                    <td className="px-4 py-2">
-                      {sm && <Badge tone={sm.tone}>{sm.label}</Badge>}
-                    </td>
-                  </tr>
+                  <Fragment key={c.id}>
+                    <tr
+                      onClick={() => toggleAperto(c.id)}
+                      className="cursor-pointer border-t border-border transition-colors hover:bg-white/5"
+                      title={isAperto ? 'Comprimi dettaglio sottoprodotti' : 'Espandi per vedere i sottoprodotti'}
+                    >
+                      <td className="px-2 py-2 text-text-muted">
+                        {isAperto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </td>
+                      <td className="px-4 py-2 text-text-muted tabular-nums">{formatDate(c.data_sottoscrizione)}</td>
+                      <td className="px-4 py-2 text-white">{c.pdv?.nome || '—'}</td>
+                      <td className="px-4 py-2">
+                        {pm && <Badge tone={pm.tone}>{pm.label}</Badge>}
+                      </td>
+                      <td className="px-4 py-2">
+                        {sm && <Badge tone={sm.tone}>{sm.label}</Badge>}
+                      </td>
+                    </tr>
+                    {isAperto && (
+                      <tr className="border-t border-border bg-bg/40">
+                        <td></td>
+                        <td colSpan={4} className="px-4 py-3">
+                          <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-text-muted">
+                            <Package size={12} /> Sottoprodotti venduti ({sps.length})
+                          </div>
+                          {sps.length === 0 ? (
+                            <div className="text-xs text-text-muted">Nessun sottoprodotto associato a questo contratto.</div>
+                          ) : (
+                            <ul className="space-y-1">
+                              {sps.map(sp => (
+                                <li
+                                  key={sp.id}
+                                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-bg px-3 py-1.5"
+                                >
+                                  <span className="text-sm text-white">{sp.nome}</span>
+                                  <span className="text-xs tabular-nums text-text-muted">
+                                    {formatInt(sp.punti)} pt · {formatEuro(sp.fatturato_pdv)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 )
               })}
             </tbody>
