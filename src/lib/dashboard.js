@@ -253,3 +253,99 @@ export function topPdvPerContratti(contratti, n = 5) {
   }
   return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, n)
 }
+
+// Stati che contano per le medie (un contratto in KO non genera valore reale).
+const STATI_MEDIE = ['validato','gettonato','stornato']
+
+/**
+ * Carica TUTTI i contratti "validi" della rete (validati, gettonati, stornati),
+ * indipendentemente dal mese, e calcola le medie di gettone (fatturato azienda)
+ * e punti per ciascun prodotto + le medie per cliente.
+ *
+ * Usato nella Home dell'Admin per le card "Medie globali".
+ *
+ * @param {string[]|null} pdvIds null = tutta la rete, array = scope ristretto
+ * @returns {Promise<object>} oggetto medie (vedi calcolaMedieGlobali)
+ */
+export async function fetchMedieGlobali(pdvIds = null) {
+  let q = supabase
+    .from('contratti')
+    .select(`
+      cliente_id, prodotto, stato,
+      punti_snap, fatturato_azienda_snap,
+      contratto_sottoprodotti(sottoprodotti(punti, fatturato_azienda))
+    `)
+    .in('stato', STATI_MEDIE)
+
+  if (Array.isArray(pdvIds)) {
+    if (pdvIds.length === 0) {
+      return calcolaMedieGlobali([])
+    }
+    q = q.in('pdv_id', pdvIds)
+  }
+
+  const { data, error } = await q
+  if (error) throw error
+  return calcolaMedieGlobali(data || [])
+}
+
+/**
+ * Dati i contratti già caricati, calcola le medie aggregate.
+ * - Per gettonati/stornati usa gli snapshot (punti_snap, fatturato_azienda_snap)
+ * - Per validati somma in tempo reale dai sottoprodotti correnti
+ */
+export function calcolaMedieGlobali(contratti) {
+  const acc = {
+    mobile:  { punti: 0, fatt: 0, n: 0 },
+    fisso:   { punti: 0, fatt: 0, n: 0 },
+    energia: { punti: 0, fatt: 0, n: 0 },
+  }
+  const clienti = new Set()
+  let totPuntiAll = 0, totFattAll = 0
+
+  for (const c of contratti) {
+    const isSnap = c.stato === 'gettonato' || c.stato === 'stornato'
+    let punti = 0, fatt = 0
+    if (isSnap) {
+      punti = c.punti_snap || 0
+      fatt  = c.fatturato_azienda_snap || 0
+    } else {
+      for (const r of (c.contratto_sottoprodotti || [])) {
+        punti += r.sottoprodotti?.punti || 0
+        fatt  += r.sottoprodotti?.fatturato_azienda || 0
+      }
+    }
+    const b = acc[c.prodotto]
+    if (b) { b.punti += punti; b.fatt += fatt; b.n += 1 }
+    totPuntiAll += punti
+    totFattAll += fatt
+    if (c.cliente_id) clienti.add(c.cliente_id)
+  }
+
+  // Arrotondamento intero (il progetto lavora a €/punti senza decimali, §0)
+  const avg = (tot, n) => n > 0 ? Math.round(tot / n) : 0
+  const nClienti = clienti.size
+
+  return {
+    // Conteggi (utili come hint sotto le card)
+    nContratti:        contratti.length,
+    nContrattiMobile:  acc.mobile.n,
+    nContrattiFisso:   acc.fisso.n,
+    nContrattiEnergia: acc.energia.n,
+    nClienti,
+
+    // Medie gettone (fatturato azienda) per prodotto
+    mediaGettoneMobile:  avg(acc.mobile.fatt,  acc.mobile.n),
+    mediaGettoneFisso:   avg(acc.fisso.fatt,   acc.fisso.n),
+    mediaGettoneEnergia: avg(acc.energia.fatt, acc.energia.n),
+
+    // Medie punti per prodotto
+    mediaPuntiMobile:  avg(acc.mobile.punti,  acc.mobile.n),
+    mediaPuntiFisso:   avg(acc.fisso.punti,   acc.fisso.n),
+    mediaPuntiEnergia: avg(acc.energia.punti, acc.energia.n),
+
+    // Medie per cliente (totale generato / numero clienti distinti)
+    mediaPuntiCliente:   avg(totPuntiAll, nClienti),
+    mediaGettoneCliente: avg(totFattAll, nClienti),
+  }
+}

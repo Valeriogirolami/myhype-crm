@@ -14,6 +14,7 @@ import {
 import {
   TrendingUp, FileCheck, Coins, Trophy, Target as TargetIcon,
   Loader2, ArrowUpRight, ArrowDownRight, Minus,
+  Smartphone, Wifi, Zap, Users,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
@@ -22,6 +23,7 @@ import MesePicker from '@/components/ui/MesePicker'
 import {
   fetchContrattiMese, fetchTargetTotaliRete, aggregaPerProdotto,
   topPdvPerContratti, ymPrecedente, tipoMese, giorniTotaliMese, giorniConsumati,
+  fetchMedieGlobali,
 } from '@/lib/dashboard'
 import { getPdvScopeIds } from '@/lib/classifiche'
 import { checkContrattiFermiBO } from '@/lib/notifiche'
@@ -60,6 +62,9 @@ function HomeAdmin() {
   const [scopeIds, setScopeIds] = useState(null)
   const [scopeReady, setScopeReady] = useState(false)
 
+  // Medie globali (solo Admin): caricate una sola volta a init pagina
+  const [medie, setMedie] = useState(null)
+
   async function fetchAll() {
     setLoading(true)
     try {
@@ -68,15 +73,21 @@ function HomeAdmin() {
       setScopeIds(ids)
       setScopeReady(true)
 
-      // 2) Carico contratti e target con il filtro
-      const [c, t, cPrev] = await Promise.all([
+      // 2) Carico contratti e target con il filtro.
+      //    Per gli Admin carico anche le medie globali in parallelo (usate
+      //    nella sezione "Medie globali rete" sotto la dashboard mensile).
+      const queries = [
         fetchContrattiMese(meseSel, ids),
         fetchTargetTotaliRete(meseSel, ids),
         fetchContrattiMese(ymPrecedente(meseSel), ids),
-      ])
-      setContratti(c)
-      setTargetRete(t)
-      setContrattiPrev(cPrev)
+      ]
+      if (isAdmin) queries.push(fetchMedieGlobali(ids))
+
+      const res = await Promise.all(queries)
+      setContratti(res[0])
+      setTargetRete(res[1])
+      setContrattiPrev(res[2])
+      if (isAdmin) setMedie(res[3])
     } catch (err) {
       toast.error(`Errore caricamento dashboard: ${err.message}`)
     } finally {
@@ -342,6 +353,86 @@ function HomeAdmin() {
               </div>
             </div>
           </div>
+
+          {/* === Riga 4: Medie globali rete (solo Admin) ===
+              KPI calcolati su TUTTI i contratti validi (validato/gettonato/stornato),
+              indipendentemente dal mese, per avere il valore medio di
+              gettone (= fatturato azienda) e punti per ogni prodotto e cliente. */}
+          {isAdmin && medie && (
+            <div className="mt-8">
+              <div className="mb-3 flex items-end justify-between">
+                <div>
+                  <h3 className="text-sm font-medium uppercase tracking-wider text-white">
+                    Medie globali rete
+                  </h3>
+                  <p className="mt-1 text-xs text-text-muted">
+                    Valori medi per contratto e per cliente, calcolati su tutti i contratti
+                    validi della rete ({formatInt(medie.nContratti)} contratti totali · {formatInt(medie.nClienti)} clienti distinti).
+                  </p>
+                </div>
+              </div>
+
+              {/* Riga 1: gettone medio per prodotto */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <KpiCard
+                  icon={Wifi}
+                  label="Media Gettone Fisso"
+                  value={formatEuro(medie.mediaGettoneFisso)}
+                  hint={`su ${formatInt(medie.nContrattiFisso)} contratti Fisso`}
+                />
+                <KpiCard
+                  icon={Smartphone}
+                  label="Media Gettone Mobile"
+                  value={formatEuro(medie.mediaGettoneMobile)}
+                  hint={`su ${formatInt(medie.nContrattiMobile)} contratti Mobile`}
+                />
+                <KpiCard
+                  icon={Zap}
+                  label="Media Gettone Energia"
+                  value={formatEuro(medie.mediaGettoneEnergia)}
+                  hint={`su ${formatInt(medie.nContrattiEnergia)} contratti Energia`}
+                />
+              </div>
+
+              {/* Riga 2: punti medi per prodotto */}
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <KpiCard
+                  icon={Wifi}
+                  label="Media Punti Fisso"
+                  value={formatInt(medie.mediaPuntiFisso)}
+                  hint={`su ${formatInt(medie.nContrattiFisso)} contratti Fisso`}
+                />
+                <KpiCard
+                  icon={Smartphone}
+                  label="Media Punti Mobile"
+                  value={formatInt(medie.mediaPuntiMobile)}
+                  hint={`su ${formatInt(medie.nContrattiMobile)} contratti Mobile`}
+                />
+                <KpiCard
+                  icon={Zap}
+                  label="Media Punti Energia"
+                  value={formatInt(medie.mediaPuntiEnergia)}
+                  hint={`su ${formatInt(medie.nContrattiEnergia)} contratti Energia`}
+                />
+              </div>
+
+              {/* Riga 3: medie per cliente */}
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <KpiCard
+                  icon={Users}
+                  label="Media punti per cliente"
+                  value={formatInt(medie.mediaPuntiCliente)}
+                  hint={`su ${formatInt(medie.nClienti)} clienti distinti`}
+                />
+                <KpiCard
+                  icon={Users}
+                  label="Media gettone per cliente"
+                  value={formatEuro(medie.mediaGettoneCliente)}
+                  hint={`fatturato azienda medio · ${formatInt(medie.nClienti)} clienti distinti`}
+                />
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
