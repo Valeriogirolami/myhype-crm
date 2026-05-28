@@ -211,6 +211,9 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
   function canNextStep0() {
     if (clienteEsistenteId) return true
     if (!cliente.categoria) return false
+    // BLOCCO doppioni: se esistono clienti con lo stesso CF, non si può
+    // proseguire senza prima cliccare "Usa questo" su uno di loro (§4.3).
+    if (duplicatiCF.length > 0) return false
     if (cliente.categoria === 'privato') {
       return !!cliente.nome && !!cliente.cognome && !!cliente.codice_fiscale && !!cliente.email && !!cliente.telefono
     }
@@ -349,7 +352,12 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
       })
       onCreated?.()
     } catch (err) {
-      toast.error(`Errore: ${err.message}`)
+      // Errore CF già esistente (vincolo UNIQUE sul DB): messaggio chiaro
+      if (err?.code === '23505' && /codice_fiscale/i.test(err?.message || '')) {
+        toast.error('Questo Codice Fiscale è già presente. Torna allo step "Cliente" e usa il cliente esistente.')
+      } else {
+        toast.error(`Errore: ${err.message}`)
+      }
     } finally {
       setSaving(false)
     }
@@ -596,10 +604,10 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
           </div>
 
           {!clienteEsistenteId && duplicati.length > 0 && (
-            <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-warning">
+            <div className="rounded-xl border border-danger/50 bg-danger/10 p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-danger">
                 <Search size={14} />
-                Esistono già {duplicati.length} {duplicati.length === 1 ? 'cliente' : 'clienti'} con questo CF:
+                Questo CF è già presente: devi usare uno dei clienti esistenti.
               </div>
               <ul className="space-y-1.5">
                 {duplicati.map(c => (
@@ -608,14 +616,15 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
                       <div className="text-white">{nomeCliente(c)}</div>
                       <div className="text-xs text-text-muted">{c.email} · {c.telefono}</div>
                     </div>
-                    <Button size="sm" variant="secondary" onClick={() => onUseEsistente(c)}>
+                    <Button size="sm" onClick={() => onUseEsistente(c)}>
                       Usa questo
                     </Button>
                   </li>
                 ))}
               </ul>
               <p className="mt-2 text-xs text-text-muted">
-                Oppure continua e crea comunque un nuovo cliente — è ammesso (§4.3).
+                Per evitare doppioni nell'anagrafica, ogni cliente esiste una sola volta per Codice Fiscale.
+                Se hai sbagliato CF, correggilo qui sopra.
               </p>
             </div>
           )}
