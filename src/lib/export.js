@@ -29,11 +29,34 @@ function timestamp() {
  * @param {{nome: string, righe: object[]}[]} sheets
  * @param {string} nomeBase  nome file senza estensione
  */
+// Calcola larghezze colonne in base alla lunghezza massima dei contenuti
+// (clamp tra 10 e 50 caratteri) — Excel le rispetta come hint.
+function calcolaLarghezze(righe) {
+  if (!righe.length) return []
+  const chiavi = Object.keys(righe[0])
+  return chiavi.map(k => {
+    let maxLen = k.length
+    for (const r of righe) {
+      const v = r[k]
+      if (v == null) continue
+      const len = String(v).length
+      if (len > maxLen) maxLen = len
+    }
+    return { wch: Math.min(50, Math.max(10, maxLen + 2)) }
+  })
+}
+
 export async function scaricaXlsx(sheets, nomeBase) {
   const XLSX = await getXLSX()
   const wb = XLSX.utils.book_new()
   for (const { nome, righe } of sheets) {
-    const ws = XLSX.utils.json_to_sheet(righe.length ? righe : [{}])
+    const dati = righe.length ? righe : [{}]
+    const ws = XLSX.utils.json_to_sheet(dati)
+    // Larghezza colonne automatica per leggibilità
+    ws['!cols'] = calcolaLarghezze(dati)
+    // Congela la prima riga (intestazioni sempre visibili durante lo scroll)
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 }
+    ws['!autofilter'] = { ref: ws['!ref'] }
     // Excel limita i nomi foglio a 31 caratteri e vieta alcuni simboli
     const nomeFoglio = (nome || 'Foglio').replace(/[\\/?*[\]:]/g, '').slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, nomeFoglio)

@@ -30,6 +30,22 @@ import { scaricaXlsx, esportaDatabaseCompleto } from '@/lib/export'
 
 const OPZIONI_PAGINA = [10, 25, 100, 'tutti']
 
+// Etichette leggibili per i motivi KO (per l'export Excel)
+const ETICHETTA_KO_NON_VAL = {
+  non_trovato: 'Non trovato',
+  documenti_non_validi: 'Documenti non validi',
+  manca_firma: 'Manca firma',
+  manca_modulo_avvenuto_contatto: 'Manca modulo avvenuto contatto',
+}
+const ETICHETTA_KO = {
+  rifiuto_cliente: 'Rifiuto cliente',
+  ko_tecnico: 'KO tecnico',
+  ko_credito: 'KO credito',
+  ko_altro: 'KO altro motivo',
+}
+const ETICHETTA_PDV_TIPO = { sinergia: 'Sinergia', galleria: 'Galleria' }
+const ETICHETTA_CATEGORIA_CLIENTE = { privato: 'Privato', azienda: 'Azienda' }
+
 export default function Contratti() {
   const { profile } = useAuth()
   const canCreate = ['admin','bo','pdv'].includes(profile?.ruolo)
@@ -79,12 +95,17 @@ export default function Contratti() {
     let q = supabase
       .from('contratti')
       .select(`
-        id, data_sottoscrizione, stato, prodotto, note, mese_gettonamento, mese_storno,
-        fatturato_pdv_snap, punti_snap,
-        cliente:clienti(id, nome, cognome, ragione_sociale, categoria, codice_fiscale),
+        id, data_sottoscrizione, stato, prodotto,
+        note, note_bo, mese_gettonamento, mese_storno,
+        motivo_ko_non_validato, motivo_ko, note_ko,
+        fatturato_pdv_snap, punti_snap, fatturato_azienda_snap,
+        cliente:clienti(
+          id, nome, cognome, ragione_sociale, categoria, codice_fiscale,
+          p_iva, email, telefono, telefono_fisso, iban, pod, pdr, codice_contratto
+        ),
         pdv:pdv(id, nome, tipo, area, categoria),
         venditore:collaboratori(id, nome, cognome),
-        contratto_sottoprodotti(sottoprodotti(id, punti, fatturato_pdv))
+        contratto_sottoprodotti(sottoprodotti(id, nome, punti, fatturato_pdv, fatturato_azienda))
       `)
       .order('data_sottoscrizione', { ascending: false })
 
@@ -196,27 +217,76 @@ export default function Contratti() {
   }, [filtered, page, pageSize])
 
   // --- Export Excel ---
+  // Costruisce una riga "piatta" pronta per l'Excel.
+  // Le colonne sono ordinate per leggibilità (contratto → cliente → PdV →
+  // venditore → prodotti → economici → date stato → note). La colonna
+  // "Fatturato Azienda" è inclusa SOLO per il ruolo Admin (richiesta Valerio).
   function rigaExport(r) {
-    const sp = (r.contratto_sottoprodotti || []).map(x => x.sottoprodotti).filter(Boolean)
-    const t = calcolaTotali(sp)
-    const punti = r.stato === 'gettonato' ? (r.punti_snap ?? t.punti) : t.punti
-    const fatt  = r.stato === 'gettonato' ? (r.fatturato_pdv_snap ?? t.fatturato_pdv) : t.fatturato_pdv
-    return {
+    const sps = (r.contratto_sottoprodotti || []).map(x => x.sottoprodotti).filter(Boolean)
+    const t = calcolaTotali(sps)
+    const gettonato = r.stato === 'gettonato' || r.stato === 'stornato'
+    const punti      = gettonato ? (r.punti_snap ?? t.punti) : t.punti
+    const fattPdv    = gettonato ? (r.fatturato_pdv_snap ?? t.fatturato_pdv) : t.fatturato_pdv
+    const fattAz     = gettonato ? (r.fatturato_azienda_snap ?? t.fatturato_azienda) : t.fatturato_azienda
+
+    const cli = r.cliente || {}
+    const pdv = r.pdv || {}
+
+    const riga = {
+      // === CONTRATTO ===
       'Data sottoscrizione': formatDate(r.data_sottoscrizione),
-      'Cliente': nomeCliente(r.cliente),
-      'Codice Fiscale': r.cliente?.codice_fiscale || '',
-      'Categoria': r.cliente?.categoria === 'azienda' ? 'Azienda' : 'Privato',
-      'PdV': r.pdv?.nome || '',
-      'Area': r.pdv?.area ?? '',
-      'Venditore': r.venditore ? `${r.venditore.nome} ${r.venditore.cognome}` : '',
-      'Prodotto': PRODOTTI[r.prodotto]?.label || r.prodotto,
-      'Punti': punti,
-      'Fatturato PdV (€)': fatt,
       'Stato': STATI[r.stato]?.label || r.stato,
+
+      // === CLIENTE ===
+      'Cliente': nomeCliente(cli),
+      'Categoria cliente': ETICHETTA_CATEGORIA_CLIENTE[cli.categoria] || '',
+      'Ragione sociale': cli.ragione_sociale || '',
+      'Codice Fiscale': cli.codice_fiscale || '',
+      'P.IVA': cli.p_iva || '',
+      'Email': cli.email || '',
+      'Telefono cellulare': cli.telefono || '',
+      'Telefono fisso': cli.telefono_fisso || '',
+      'IBAN': cli.iban || '',
+      'POD': cli.pod || '',
+      'PDR': cli.pdr || '',
+      'Codice Contratto': cli.codice_contratto || '',
+
+      // === PDV ===
+      'PdV': pdv.nome || '',
+      'PdV tipo': ETICHETTA_PDV_TIPO[pdv.tipo] || pdv.tipo || '',
+      'PdV area': pdv.area ?? '',
+      'PdV categoria': pdv.categoria || '',
+
+      // === VENDITORE ===
+      'Venditore': r.venditore ? `${r.venditore.nome} ${r.venditore.cognome}` : '',
+
+      // === PRODOTTI ===
+      'Prodotto': PRODOTTI[r.prodotto]?.label || r.prodotto,
+      'Sottoprodotti': sps.map(s => s.nome).join(' · '),
+      'N. sottoprodotti': sps.length,
+
+      // === ECONOMICI ===
+      'Punti': punti,
+      'Fatturato PdV (€)': fattPdv,
+    }
+
+    // Fatturato Azienda solo per Admin (BO non lo deve vedere)
+    if (isAdmin) {
+      riga['Fatturato Azienda (€)'] = fattAz
+    }
+
+    // === DATE STATO / KO / NOTE ===
+    Object.assign(riga, {
       'Mese gettonamento': r.mese_gettonamento ? formatYM(r.mese_gettonamento) : '',
       'Mese storno': r.mese_storno ? formatYM(r.mese_storno) : '',
-      'Note': r.note || '',
-    }
+      'Motivo KO non validato': ETICHETTA_KO_NON_VAL[r.motivo_ko_non_validato] || '',
+      'Motivo KO': ETICHETTA_KO[r.motivo_ko] || '',
+      'Note KO': r.note_ko || '',
+      'Note generali': r.note || '',
+      'Note Back office': r.note_bo || '',
+    })
+
+    return riga
   }
 
   async function esportaFiltrati() {
