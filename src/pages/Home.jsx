@@ -128,11 +128,16 @@ function HomeAdmin() {
     return s + t
   }, 0)
   // Fatturato previsto: solo VALIDATI (non gettonati né stornati) — §6
+  // Admin vede il fatturato AZIENDA (gettone, "quanto guadagna Hype");
+  // gli altri ruoli vedono il fatturato PdV come prima (privacy).
   const fattPrevisto = contratti
     .filter(c => c.stato === 'validato')
     .reduce((s, c) => {
       const sps = (c.contratto_sottoprodotti || []).map(r => r.sottoprodotti).filter(Boolean)
-      return s + sps.reduce((ss, sp) => ss + (sp.fatturato_pdv || 0), 0)
+      return s + sps.reduce((ss, sp) => {
+        const v = isAdmin ? (sp.fatturato_azienda || 0) : (sp.fatturato_pdv || 0)
+        return ss + v
+      }, 0)
     }, 0)
 
   // Target totali (rete)
@@ -230,9 +235,9 @@ function HomeAdmin() {
             />
             <KpiCard
               icon={Coins}
-              label="Fatturato previsto"
+              label={isAdmin ? 'Fatturato Azienda previsto' : 'Fatturato previsto'}
               value={formatEuro(fattPrevisto)}
-              hint="Somma fatturato PdV dei validati"
+              hint={isAdmin ? 'Somma fatturato Azienda dei validati' : 'Somma fatturato PdV dei validati'}
             />
             <KpiCard
               icon={TargetIcon}
