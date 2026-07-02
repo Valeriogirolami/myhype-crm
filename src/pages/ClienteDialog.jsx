@@ -48,7 +48,7 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
           .from('contratti')
           .select(`
             id, prodotto, stato, data_sottoscrizione, mese_gettonamento, mese_storno,
-            fatturato_pdv_snap, punti_snap,
+            fatturato_pdv_snap, punti_snap, codice_contratto,
             pdv:pdv(id, nome),
             contratto_sottoprodotti(sottoprodotti(id, nome, punti, fatturato_pdv))
           `)
@@ -89,7 +89,6 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
       iban: data.iban || '',
       pod: data.pod || '',
       pdr: data.pdr || '',
-      codice_contratto: data.codice_contratto || '',
     })
   }, [editing, data])
 
@@ -140,7 +139,6 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
         iban: form.iban.trim() || null,
         pod: form.pod.trim() || null,
         pdr: form.pdr.trim() || null,
-        codice_contratto: form.codice_contratto.trim() || null,
       }
       const { error } = await supabase
         .from('clienti').update(payload).eq('id', clienteId)
@@ -300,11 +298,6 @@ function ViewCliente({ data, contratti, stats }) {
             </div>
           )}
         </Info>
-        <div className="sm:col-span-2">
-          <Info icon={FileText} label="Codice Contratto">
-            <div className="text-white tabular-nums break-all">{data.codice_contratto || <span className="text-text-muted">—</span>}</div>
-          </Info>
-        </div>
       </div>
 
       {/* Storico contratti */}
@@ -320,6 +313,7 @@ function ViewCliente({ data, contratti, stats }) {
               <tr className="text-left text-xs uppercase tracking-wide text-text-muted">
                 <th className="w-8 px-2 py-2"></th>
                 <th className="px-4 py-2 font-medium">Data</th>
+                <th className="px-4 py-2 font-medium">Codice contratto</th>
                 <th className="px-4 py-2 font-medium">PdV</th>
                 <th className="px-4 py-2 font-medium">Prodotto</th>
                 <th className="px-4 py-2 font-medium">Stato</th>
@@ -343,6 +337,9 @@ function ViewCliente({ data, contratti, stats }) {
                         {isAperto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </td>
                       <td className="px-4 py-2 text-text-muted tabular-nums">{formatDate(c.data_sottoscrizione)}</td>
+                      <td className="px-4 py-2 text-white tabular-nums break-all">
+                        {c.codice_contratto || <span className="text-warning">—</span>}
+                      </td>
                       <td className="px-4 py-2 text-white">{c.pdv?.nome || '—'}</td>
                       <td className="px-4 py-2">
                         {pm && <Badge tone={pm.tone}>{pm.label}</Badge>}
@@ -354,7 +351,7 @@ function ViewCliente({ data, contratti, stats }) {
                     {isAperto && (
                       <tr className="border-t border-border bg-bg/40">
                         <td></td>
-                        <td colSpan={4} className="px-4 py-3">
+                        <td colSpan={5} className="px-4 py-3">
                           <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-text-muted">
                             <Package size={12} /> Sottoprodotti venduti ({sps.length})
                           </div>
@@ -425,10 +422,6 @@ function FormCliente({ form, setF }) {
 
         <Input label="POD (Energia)" hint="Opzionale" value={form.pod} onChange={e => setF('pod', e.target.value)} />
         <Input label="PDR (Gas)" hint="Opzionale" value={form.pdr} onChange={e => setF('pdr', e.target.value)} />
-
-        <div className="sm:col-span-2">
-          <Input label="Codice Contratto" hint="Campo libero" value={form.codice_contratto} onChange={e => setF('codice_contratto', e.target.value)} />
-        </div>
       </div>
     </div>
   )

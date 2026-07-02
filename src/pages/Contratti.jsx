@@ -95,13 +95,13 @@ export default function Contratti() {
     let q = supabase
       .from('contratti')
       .select(`
-        id, data_sottoscrizione, stato, prodotto,
+        id, data_sottoscrizione, stato, prodotto, codice_contratto,
         note, note_bo, mese_gettonamento, mese_storno,
         motivo_ko_non_validato, motivo_ko, note_ko,
         fatturato_pdv_snap, punti_snap, fatturato_azienda_snap,
         cliente:clienti(
           id, nome, cognome, ragione_sociale, categoria, codice_fiscale,
-          p_iva, email, telefono, telefono_fisso, iban, pod, pdr, codice_contratto
+          p_iva, email, telefono, telefono_fisso, iban, pod, pdr
         ),
         pdv:pdv(id, nome, tipo, area, categoria),
         venditore:collaboratori(id, nome, cognome),
@@ -235,6 +235,7 @@ export default function Contratti() {
     const riga = {
       // === CONTRATTO ===
       'Data sottoscrizione': formatDate(r.data_sottoscrizione),
+      'Codice Contratto': r.codice_contratto || '',
       'Stato': STATI[r.stato]?.label || r.stato,
 
       // === CLIENTE ===
@@ -249,7 +250,6 @@ export default function Contratti() {
       'IBAN': cli.iban || '',
       'POD': cli.pod || '',
       'PDR': cli.pdr || '',
-      'Codice Contratto': cli.codice_contratto || '',
 
       // === PDV ===
       'PdV': pdv.nome || '',

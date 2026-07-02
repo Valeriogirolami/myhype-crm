@@ -69,6 +69,9 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
   const [sottoprodottiSel, setSottoprodottiSel] = useState([])
   const [sottoprodottiDisp, setSottoprodottiDisp] = useState([])
   const [loadingSp, setLoadingSp] = useState(false)
+  // Codice contratto per PRODOTTO (obbligatorio dal 2026-05-24) — stesso
+  // cliente può avere più contratti (Mobile+Fisso+…) e ognuno ha un codice
+  const [codiceContratto, setCodiceContratto] = useState('')
 
   // ===== Step 3: PdV + Persona + Note =====
   const [pdvSelId, setPdvSelId] = useState('')
@@ -96,6 +99,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
     setTipoEnergia('')
     setSottoprodottiSel([])
     setSottoprodottiDisp([])
+    setCodiceContratto('')
     setVenditore('')
     setNote('')
   }
@@ -192,7 +196,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
     const t = setTimeout(async () => {
       const { data } = await supabase
         .from('clienti')
-        .select('id, nome, cognome, ragione_sociale, categoria, codice_fiscale, email, telefono, telefono_fisso, iban, pod, pdr, codice_contratto')
+        .select('id, nome, cognome, ragione_sociale, categoria, codice_fiscale, email, telefono, telefono_fisso, iban, pod, pdr')
         .ilike('codice_fiscale', cf)
       setDuplicatiCF(data || [])
     }, 400)
@@ -223,7 +227,10 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
     if (!prodotto) return false
     // Per Energia: tipo (luce/gas) obbligatorio
     if (prodotto === 'energia' && !tipoEnergia) return false
-    return sottoprodottiSel.length >= 1 && sottoprodottiSel.length <= 5
+    if (sottoprodottiSel.length < 1 || sottoprodottiSel.length > 5) return false
+    // Codice Contratto obbligatorio (per prodotto, univoco per il contratto)
+    if (!codiceContratto.trim()) return false
+    return true
   }
   function canSubmit() {
     return !!pdvSelId && !!venditore
@@ -244,7 +251,6 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
       iban: c.iban || '',
       pod: c.pod || '',
       pdr: c.pdr || '',
-      codice_contratto: c.codice_contratto || '',
     })
     setDuplicatiCF([])
     toast.success(`Userai i dati del cliente esistente: ${nomeCliente(c)}`)
@@ -293,7 +299,6 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           iban: cliente.iban || null,
           pod: cliente.pod || null,
           pdr: cliente.pdr || null,
-          codice_contratto: cliente.codice_contratto || null,
         }
         const { data: nuovo, error: errCli } = await supabase
           .from('clienti')
@@ -315,7 +320,6 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           iban: nuovo.iban || '',
           pod: nuovo.pod || '',
           pdr: nuovo.pdr || '',
-          codice_contratto: nuovo.codice_contratto || '',
         }
       }
 
@@ -329,6 +333,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           prodotto,
           stato: 'da_validare',
           note: note || null,
+          codice_contratto: codiceContratto.trim(),
         }])
         .select()
         .single()
@@ -488,6 +493,8 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           sottoprodottiDisp={sottoprodottiDisponibili}
           loading={loadingSp}
           totali={totali}
+          codiceContratto={codiceContratto}
+          setCodiceContratto={setCodiceContratto}
         />
       )}
 
@@ -599,8 +606,6 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
 
             <Input label="POD (solo Energia)" hint="Opzionale" value={cliente.pod} onChange={e => set('pod', e.target.value)} disabled={!!clienteEsistenteId} />
             <Input label="PDR (solo Gas)"      hint="Opzionale" value={cliente.pdr} onChange={e => set('pdr', e.target.value)} disabled={!!clienteEsistenteId} />
-
-            <Input label="Codice Contratto" hint="Opzionale — campo libero" value={cliente.codice_contratto} onChange={e => set('codice_contratto', e.target.value)} disabled={!!clienteEsistenteId} />
           </div>
 
           {!clienteEsistenteId && duplicati.length > 0 && (
@@ -636,7 +641,7 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
 
 // ---------- STEP 2: Prodotto + Sottoprodotti ----------
 
-function StepProdotto({ prodotto, setProdotto, tipoEnergia, setTipoEnergia, sottoprodottiSel, setSottoprodottiSel, sottoprodottiDisp, loading, totali }) {
+function StepProdotto({ prodotto, setProdotto, tipoEnergia, setTipoEnergia, sottoprodottiSel, setSottoprodottiSel, sottoprodottiDisp, loading, totali, codiceContratto, setCodiceContratto }) {
   function aggiungi(sp) {
     if (sottoprodottiSel.length >= 5) {
       toast.error('Massimo 5 sottoprodotti per contratto.')
@@ -661,6 +666,18 @@ function StepProdotto({ prodotto, setProdotto, tipoEnergia, setTipoEnergia, sott
 
   return (
     <div className="space-y-4">
+      {/* Codice Contratto — obbligatorio per prodotto (richiesta Valerio 2026-05-24)
+          Sta qui in cima perché è la prima informazione anagrafica del contratto,
+          precede la scelta del prodotto padre/sottoprodotti. */}
+      <Input
+        label="Codice Contratto"
+        required
+        placeholder="Es. 123456"
+        hint="Codice identificativo di QUESTO contratto (ogni prodotto ha il suo)"
+        value={codiceContratto}
+        onChange={e => setCodiceContratto(e.target.value)}
+      />
+
       <div>
         <label className="mb-2 block text-xs font-medium text-text-muted">
           Prodotto <span className="text-danger">*</span>
@@ -902,6 +919,5 @@ function emptyCliente() {
     iban: '',
     pod: '',
     pdr: '',
-    codice_contratto: '',
   }
 }

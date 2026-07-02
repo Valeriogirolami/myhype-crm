@@ -131,6 +131,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       note_ko: data.note_ko || '',
       note: data.note || '',
       note_bo: data.note_bo || '',
+      codice_contratto: data.codice_contratto || '',
       mese_gettonamento: dateToYM(data.mese_gettonamento),
       mese_storno: dateToYM(data.mese_storno),
       venditore_id: data.venditore?.id || '',
@@ -425,11 +426,16 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       setSaving(true)
 
       // === 1) Validazione + costruzione update CONTRATTO ===
+      // Codice Contratto obbligatorio (per prodotto)
+      if (!form.codice_contratto?.trim()) {
+        throw new Error('Il Codice Contratto è obbligatorio')
+      }
       const nuovoStato = form.stato
       const updates = {
         stato: nuovoStato,
         note: form.note?.trim() || null,
         note_bo: form.note_bo?.trim() || null,
+        codice_contratto: form.codice_contratto.trim(),
         venditore_id: form.venditore_id || null,
         prodotto: form.prodotto,
         motivo_ko_non_validato: null,
@@ -691,6 +697,13 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                     </>
                   )}
                 </InfoBlock>
+
+                {/* Codice Contratto (per prodotto) — sempre visibile */}
+                <InfoBlock icon={FileText} label="Codice Contratto">
+                  <div className="text-white tabular-nums break-all">
+                    {data.codice_contratto || <span className="text-warning">— da compilare —</span>}
+                  </div>
+                </InfoBlock>
               </div>
 
               {/* Sottoprodotti */}
@@ -840,6 +853,16 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                 aperta={openSezione.stato}
                 onToggle={() => setOpenSezione(s => ({ ...s, stato: !s.stato }))}
               >
+                {/* Codice Contratto — obbligatorio per prodotto (2026-05-24) */}
+                <Input
+                  label="Codice Contratto"
+                  required
+                  placeholder="Es. 123456"
+                  hint="Codice identificativo del contratto (ogni prodotto ha il suo)"
+                  value={form.codice_contratto}
+                  onChange={e => setF('codice_contratto', e.target.value)}
+                />
+
                 <Select label="Stato" required value={form.stato} onChange={e => setF('stato', e.target.value)}>
                   {STATI_MODIFICABILI.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
                 </Select>
@@ -1328,6 +1351,7 @@ function emptyForm() {
     note_ko: '',
     note: '',
     note_bo: '',
+    codice_contratto: '',
     mese_gettonamento: '',
     mese_storno: '',
     venditore_id: '',

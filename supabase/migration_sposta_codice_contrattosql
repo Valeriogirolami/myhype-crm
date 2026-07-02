@@ -1,0 +1,41 @@
+-- ============================================================================
+-- MyHype — Migrazione: sposta codice_contratto da CLIENTI a CONTRATTI
+-- ============================================================================
+-- Motivazione (richiesta Valerio 2026-05-24):
+--   Il "codice contratto" è un dato PER-CONTRATTO, non per-cliente:
+--   uno stesso cliente può sottoscrivere più contratti (Mobile + Fisso + Energia)
+--   e ciascuno ha il suo codice distinto. Va quindi spostato sulla tabella
+--   contratti. Sul cliente non serve più.
+--
+-- Comportamento:
+--   1) Aggiungo la colonna contratti.codice_contratto (text, nullable).
+--      NULLABLE per compatibilità retroattiva: i contratti già inseriti
+--      il cui cliente non aveva un codice restano validi senza codice.
+--      L'obbligatorietà è gestita nell'UI in fase di inserimento nuovo
+--      contratto (validazione client-side).
+--   2) Copio il valore da clienti.codice_contratto a tutti i contratti
+--      collegati a quel cliente (backfill).
+--      ATTENZIONE: se un cliente aveva più contratti, tutti riceveranno
+--      lo stesso codice. Andranno poi corretti singolarmente dall'app.
+--   3) Rimuovo la colonna clienti.codice_contratto (non più utilizzata).
+-- ============================================================================
+
+BEGIN;
+
+-- 1) Nuova colonna su contratti
+ALTER TABLE public.contratti
+  ADD COLUMN IF NOT EXISTS codice_contratto text;
+
+-- 2) Backfill: copio dal cliente collegato
+UPDATE public.contratti c
+SET codice_contratto = cli.codice_contratto
+FROM public.clienti cli
+WHERE cli.id = c.cliente_id
+  AND cli.codice_contratto IS NOT NULL
+  AND c.codice_contratto IS NULL;
+
+-- 3) Rimuovo la colonna dal cliente (non serve più)
+ALTER TABLE public.clienti
+  DROP COLUMN IF EXISTS codice_contratto;
+
+COMMIT;

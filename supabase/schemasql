@@ -133,7 +133,8 @@ create table public.clienti (
   iban             text not null,
   pod              text,                       -- solo se energia
   pdr              text,                       -- solo se gas/energia (variante)
-  codice_contratto text,                       -- campo libero (es. codice contratto fornitore)
+  -- Nota: codice_contratto è stato spostato sulla tabella contratti
+  --       (un cliente può avere più contratti, ognuno col suo codice)
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
@@ -191,6 +192,7 @@ create table public.contratti (
 
   note                    text,
   note_bo                 text,                          -- note del Back office (lettura tutti, scrittura solo admin/bo via RLS)
+  codice_contratto        text,                          -- codice contratto univoco per prodotto (obbligatorio via UI, nullable a DB per compatibilità retroattiva)
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now(),
 
