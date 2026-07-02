@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Plus, Search, Loader2, FileText, Filter, Calendar, Coins,
-  Download, Database, ChevronLeft, ChevronRight,
+  Download, Database, ChevronLeft, ChevronRight, AlertCircle, Copy,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -319,6 +319,70 @@ export default function Contratti() {
     }
   }
 
+  // Export "senza codice contratto" — controllo qualità dati:
+  // tutti i contratti (nello scope corrente, senza applicare i filtri)
+  // che non hanno il codice contratto compilato.
+  async function esportaSenzaCodice() {
+    const senzaCodice = rows.filter(
+      r => !r.codice_contratto || !r.codice_contratto.trim()
+    )
+    if (senzaCodice.length === 0) {
+      toast.info('Nessun contratto senza codice contratto. Tutto a posto!')
+      return
+    }
+    try {
+      setExporting(true)
+      await scaricaXlsx(
+        [{ nome: 'Senza codice contratto', righe: senzaCodice.map(rigaExport) }],
+        'MyHype_contratti_SENZA_codice'
+      )
+      toast.success(`Esportati ${senzaCodice.length} contratti senza codice.`)
+    } catch (err) {
+      toast.error(`Errore export: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  // Export "doppioni codice contratto" — controllo qualità dati:
+  // tutti i contratti con codice_contratto duplicato (2+ occorrenze).
+  // Il matching è case-insensitive e trim-ato per intercettare varianti tipo
+  // '444' vs ' 444 '. L'output è ordinato per codice → doppioni adiacenti.
+  async function esportaDoppioniCodice() {
+    const gruppi = new Map()
+    for (const r of rows) {
+      const cod = (r.codice_contratto || '').trim().toUpperCase()
+      if (!cod) continue
+      if (!gruppi.has(cod)) gruppi.set(cod, [])
+      gruppi.get(cod).push(r)
+    }
+    const doppioni = []
+    for (const arr of gruppi.values()) {
+      if (arr.length > 1) doppioni.push(...arr)
+    }
+    if (doppioni.length === 0) {
+      toast.info('Nessun codice contratto duplicato. Tutto a posto!')
+      return
+    }
+    // Ordino per codice così i doppioni escono adiacenti in Excel
+    doppioni.sort((a, b) =>
+      (a.codice_contratto || '').toUpperCase()
+        .localeCompare((b.codice_contratto || '').toUpperCase())
+    )
+    try {
+      setExporting(true)
+      await scaricaXlsx(
+        [{ nome: 'Doppioni codice', righe: doppioni.map(rigaExport) }],
+        'MyHype_contratti_DOPPIONI_codice'
+      )
+      toast.success(`Esportati ${doppioni.length} contratti con codice duplicato.`)
+    } catch (err) {
+      toast.error(`Errore export: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // Solo i validati possono essere selezionati (per gettonamento massivo)
   const selezionabiliVisibili = useMemo(
     () => filtered.filter(r => r.stato === 'validato'),
@@ -365,6 +429,30 @@ export default function Contratti() {
             <Button variant="secondary" onClick={esportaFiltrati} loading={exporting}>
               <Download size={16} />
               Esporta Excel
+            </Button>
+          )}
+          {/* Export "senza codice contratto" — controllo qualità dati (Admin/BO) */}
+          {isBoAdmin && (
+            <Button
+              variant="secondary"
+              onClick={esportaSenzaCodice}
+              loading={exporting}
+              title="Scarica un Excel con tutti i contratti senza codice contratto compilato"
+            >
+              <AlertCircle size={16} />
+              Senza codice
+            </Button>
+          )}
+          {/* Export "doppioni codice contratto" — controllo qualità dati (Admin/BO) */}
+          {isBoAdmin && (
+            <Button
+              variant="secondary"
+              onClick={esportaDoppioniCodice}
+              loading={exporting}
+              title="Scarica un Excel con tutti i contratti che condividono lo stesso codice"
+            >
+              <Copy size={16} />
+              Doppioni codice
             </Button>
           )}
           {/* Export totale database — solo Admin */}
