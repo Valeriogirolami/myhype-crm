@@ -637,8 +637,10 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                 <FileText size={18} />
               </div>
               <div>
-                <div className="text-xs text-text-muted">Contratto</div>
-                <div className="tabular-nums text-white">#{data.id.slice(0, 8)}</div>
+                <div className="text-xs text-text-muted">Codice contratto</div>
+                <div className="tabular-nums text-white text-lg font-medium">
+                  {data.codice_contratto || <span className="text-warning">— da compilare —</span>}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -698,12 +700,6 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                   )}
                 </InfoBlock>
 
-                {/* Codice Contratto (per prodotto) — sempre visibile */}
-                <InfoBlock icon={FileText} label="Codice Contratto">
-                  <div className="text-white tabular-nums break-all">
-                    {data.codice_contratto || <span className="text-warning">— da compilare —</span>}
-                  </div>
-                </InfoBlock>
               </div>
 
               {/* Sottoprodotti */}
