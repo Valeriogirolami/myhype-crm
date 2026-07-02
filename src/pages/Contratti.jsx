@@ -186,6 +186,7 @@ export default function Contratti() {
         const blob = [
           r.cliente?.nome, r.cliente?.cognome, r.cliente?.ragione_sociale,
           r.cliente?.codice_fiscale, r.venditore?.nome, r.venditore?.cognome,
+          r.codice_contratto,
         ].join(' ').toLowerCase()
         if (!blob.includes(q)) return false
       }
@@ -390,7 +391,7 @@ export default function Contratti() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Cerca per CF, nome cliente, venditore…"
+              placeholder="Cerca per codice contratto, CF, nome cliente, venditore…"
               className="w-full rounded-xl border border-border bg-bg py-2 pl-10 pr-3 text-sm text-white placeholder:text-text-muted/60 outline-none transition focus:border-accent"
             />
           </div>
