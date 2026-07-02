@@ -26,6 +26,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Badge from '@/components/ui/Badge'
+import DatePicker from '@/components/ui/DatePicker'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
@@ -72,6 +73,10 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
   // Codice contratto per PRODOTTO (obbligatorio dal 2026-05-24) — stesso
   // cliente può avere più contratti (Mobile+Fisso+…) e ognuno ha un codice
   const [codiceContratto, setCodiceContratto] = useState('')
+  // Data stipula effettiva (obbligatoria dal 2026-07-03) — il venditore/PdV
+  // la sceglie tra oggi e 5 giorni fa; BO/Admin senza limiti in dettaglio.
+  // Default: oggi.
+  const [dataStipula, setDataStipula] = useState(() => ymdOggi())
 
   // ===== Step 3: PdV + Persona + Note =====
   const [pdvSelId, setPdvSelId] = useState('')
@@ -100,6 +105,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
     setSottoprodottiSel([])
     setSottoprodottiDisp([])
     setCodiceContratto('')
+    setDataStipula(ymdOggi())
     setVenditore('')
     setNote('')
   }
@@ -230,6 +236,11 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
     if (sottoprodottiSel.length < 1 || sottoprodottiSel.length > 5) return false
     // Codice Contratto obbligatorio (per prodotto, univoco per il contratto)
     if (!codiceContratto.trim()) return false
+    // Data stipula: obbligatoria e tra oggi-5gg e oggi (limite inserimento)
+    if (!dataStipula) return false
+    const oggi = ymdOggi()
+    const min5 = ymdMenoGiorni(5)
+    if (dataStipula > oggi || dataStipula < min5) return false
     return true
   }
   function canSubmit() {
@@ -334,6 +345,9 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           stato: 'da_validare',
           note: note || null,
           codice_contratto: codiceContratto.trim(),
+          // data_sottoscrizione = data registrazione (DB default: oggi)
+          // data_stipula = data reale scelta dal venditore/PdV
+          data_stipula: dataStipula,
         }])
         .select()
         .single()
@@ -495,6 +509,8 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
           totali={totali}
           codiceContratto={codiceContratto}
           setCodiceContratto={setCodiceContratto}
+          dataStipula={dataStipula}
+          setDataStipula={setDataStipula}
         />
       )}
 
@@ -641,7 +657,12 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
 
 // ---------- STEP 2: Prodotto + Sottoprodotti ----------
 
-function StepProdotto({ prodotto, setProdotto, tipoEnergia, setTipoEnergia, sottoprodottiSel, setSottoprodottiSel, sottoprodottiDisp, loading, totali, codiceContratto, setCodiceContratto }) {
+function StepProdotto({ prodotto, setProdotto, tipoEnergia, setTipoEnergia, sottoprodottiSel, setSottoprodottiSel, sottoprodottiDisp, loading, totali, codiceContratto, setCodiceContratto, dataStipula, setDataStipula }) {
+  // Limiti data stipula: max = oggi, min = oggi-5 giorni (§4 nuova policy)
+  const maxData = ymdOggi()
+  const minData = ymdMenoGiorni(5)
+  // Errore inline: se la data è fuori range mostro un messaggio esplicito
+  const dataFuoriRange = dataStipula && (dataStipula > maxData || dataStipula < minData)
   function aggiungi(sp) {
     if (sottoprodottiSel.length >= 5) {
       toast.error('Massimo 5 sottoprodotti per contratto.')
@@ -677,6 +698,30 @@ function StepProdotto({ prodotto, setProdotto, tipoEnergia, setTipoEnergia, sott
         value={codiceContratto}
         onChange={e => setCodiceContratto(e.target.value)}
       />
+
+      {/* Data stipula — obbligatoria (richiesta Valerio 2026-07-03)
+          Ammessa solo tra oggi e 5 giorni fa (limite inserimento).
+          Il BO potrà correggerla senza limiti nel dettaglio contratto. */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-text-muted">
+          Data stipula <span className="text-danger">*</span>
+        </label>
+        <DatePicker
+          value={dataStipula}
+          onChange={setDataStipula}
+          placeholder="Seleziona data"
+          minDate={minData}
+          maxDate={maxData}
+        />
+        <p className={cn(
+          'mt-1 text-xs',
+          dataFuoriRange ? 'text-danger' : 'text-text-muted',
+        )}>
+          {dataFuoriRange
+            ? `Data non valida: deve essere tra ${minData} e ${maxData} (max 5 giorni indietro, non nel futuro).`
+            : 'Data reale di stipula. Ammessa da oggi a 5 giorni fa.'}
+        </p>
+      </div>
 
       <div>
         <label className="mb-2 block text-xs font-medium text-text-muted">
@@ -920,4 +965,19 @@ function emptyCliente() {
     pod: '',
     pdr: '',
   }
+}
+
+// Ritorna la data odierna in formato YYYY-MM-DD (locale)
+export function ymdOggi() {
+  const d = new Date()
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+// Ritorna la data di N giorni fa in formato YYYY-MM-DD (locale)
+export function ymdMenoGiorni(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  const p = x => String(x).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }

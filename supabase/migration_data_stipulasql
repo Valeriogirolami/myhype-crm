@@ -1,0 +1,44 @@
+-- ============================================================================
+-- MyHype — Migrazione: aggiunge data_stipula ai contratti
+-- ============================================================================
+-- Richiesta Valerio (2026-07-03):
+--   Da ora in poi i contratti hanno DUE date:
+--   1) data_sottoscrizione (rinominato semantica: "data registrazione"):
+--      quando il contratto viene registrato nel sistema. MAI modificabile.
+--      Continua a chiamarsi 'data_sottoscrizione' nel DB per compatibilità.
+--   2) data_stipula (NUOVA): quando è stato effettivamente stipulato.
+--      Obbligatoria. Il venditore la può scegliere solo tra oggi e 5 giorni fa.
+--      BO/Admin possono modificarla senza limiti temporali (validazione lato UI).
+--
+-- Backfill: per tutti i contratti già presenti, data_stipula = data_sottoscrizione.
+-- Poi il BO potrà correggerla dove serve.
+--
+-- IMPATTO STATISTICHE: tutte le classifiche, i target, le gare gallery, i
+-- fatturati e le medie ora usano data_stipula per raggruppare per mese.
+-- data_sottoscrizione (registrazione) resta solo per audit/tracking.
+-- ============================================================================
+
+BEGIN;
+
+-- 1) Aggiungo la colonna come nullable (per poter fare il backfill)
+ALTER TABLE public.contratti
+  ADD COLUMN IF NOT EXISTS data_stipula date;
+
+-- 2) Backfill: copio data_sottoscrizione (data di registrazione) come
+--    data_stipula per tutti i contratti già esistenti che non ce l'hanno.
+UPDATE public.contratti
+SET data_stipula = data_sottoscrizione
+WHERE data_stipula IS NULL;
+
+-- 3) Rendo la colonna NOT NULL con default = oggi (per i futuri INSERT)
+ALTER TABLE public.contratti
+  ALTER COLUMN data_stipula SET NOT NULL;
+
+ALTER TABLE public.contratti
+  ALTER COLUMN data_stipula SET DEFAULT current_date;
+
+-- 4) Indice per performance sulle query per range di mese (statistiche)
+CREATE INDEX IF NOT EXISTS idx_contratti_data_stipula
+  ON public.contratti(data_stipula);
+
+COMMIT;

@@ -184,8 +184,9 @@ export async function notificaTop3PerMese(ym) {
         venditore:collaboratori(id, nome, cognome, account_id),
         contratto_sottoprodotti(sottoprodotti(punti))
       `)
-      .gte('data_sottoscrizione', start)
-      .lte('data_sottoscrizione', end)
+      // Notifiche top 3: uso data_stipula per coerenza con classifiche
+      .gte('data_stipula', start)
+      .lte('data_stipula', end)
       .in('stato', ['validato', 'gettonato', 'stornato'])
     if (error) throw error
 

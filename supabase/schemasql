@@ -173,7 +173,8 @@ create table public.contratti (
   pdv_id                  uuid not null references public.pdv(id) on delete restrict,
   venditore_id            uuid references public.collaboratori(id) on delete set null,
   prodotto                prodotto not null,
-  data_sottoscrizione     date not null default current_date,
+  data_sottoscrizione     date not null default current_date,   -- "data registrazione" (immutabile, quando è stato inserito nel CRM)
+  data_stipula            date not null default current_date,   -- data reale di stipula (obbligatoria, usata per statistiche/classifiche)
 
   -- Ciclo di vita (§4.5)
   stato                   stato_contratto not null default 'da_validare',
@@ -209,6 +210,7 @@ create index idx_contratti_venditore  on public.contratti(venditore_id);
 create index idx_contratti_cliente    on public.contratti(cliente_id);
 create index idx_contratti_prodotto   on public.contratti(prodotto);
 create index idx_contratti_data       on public.contratti(data_sottoscrizione);
+create index idx_contratti_stipula    on public.contratti(data_stipula);
 create index idx_contratti_gettonato  on public.contratti(mese_gettonamento);
 
 -- ============================================================================

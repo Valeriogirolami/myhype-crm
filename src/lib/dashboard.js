@@ -2,7 +2,8 @@
  * Helper per i calcoli delle Dashboard.
  *
  * Concetti chiave (§6, §7):
- *  - Produzione = contratti VALIDATI nel mese (per data_sottoscrizione).
+
+ *  - Produzione = contratti VALIDATI nel mese (per data_stipula).
  *  - Previsione = produzione / giorno corrente × giorni totali del mese.
  *    Per mesi passati = produzione (mese chiuso).
  *    Per mesi futuri = 0.
@@ -65,7 +66,9 @@ export function giorniConsumati(ym) {
 // --------------------------------------------------------------------------
 
 /**
- * Carica i contratti VALIDATI/GETTONATI/STORNATI con data_sottoscrizione nel mese.
+ * Carica i contratti VALIDATI/GETTONATI/STORNATI con data_stipula nel mese.
+ * Il periodo è calcolato sulla data STIPULA (non la data di registrazione),
+ * perché è la data commercialmente rilevante per statistiche e classifiche.
  * Se `pdvIds` è passato (array), filtra solo i contratti di quei PdV.
  * Se è null/undefined, prende tutti i PdV (scope globale per Admin/BO/DV).
  */
@@ -75,14 +78,14 @@ export async function fetchContrattiMese(ym, pdvIds = null) {
   let q = supabase
     .from('contratti')
     .select(`
-      id, prodotto, stato, data_sottoscrizione,
+      id, prodotto, stato, data_stipula, data_sottoscrizione,
       mese_gettonamento, mese_storno,
       fatturato_pdv_snap, fatturato_azienda_snap, punti_snap,
       pdv:pdv(id, nome, tipo, area, categoria),
       contratto_sottoprodotti(sottoprodotti(punti, fatturato_pdv, fatturato_azienda))
     `)
-    .gte('data_sottoscrizione', start)
-    .lte('data_sottoscrizione', end)
+    .gte('data_stipula', start)
+    .lte('data_stipula', end)
     .in('stato', ['validato', 'gettonato', 'stornato'])
   if (pdvIds && pdvIds.length > 0) {
     q = q.in('pdv_id', pdvIds)

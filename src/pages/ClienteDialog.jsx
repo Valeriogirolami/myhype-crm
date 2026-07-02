@@ -47,13 +47,14 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
         supabase
           .from('contratti')
           .select(`
-            id, prodotto, stato, data_sottoscrizione, mese_gettonamento, mese_storno,
+            id, prodotto, stato, data_stipula, data_sottoscrizione, mese_gettonamento, mese_storno,
             fatturato_pdv_snap, punti_snap, codice_contratto,
             pdv:pdv(id, nome),
             contratto_sottoprodotti(sottoprodotti(id, nome, punti, fatturato_pdv))
           `)
           .eq('cliente_id', clienteId)
-          .order('data_sottoscrizione', { ascending: false }),
+          // Storico contratti ordinato per data stipula (data commerciale)
+          .order('data_stipula', { ascending: false }),
       ])
       if (resCli.error) throw resCli.error
       if (resCtr.error) throw resCtr.error
@@ -336,7 +337,13 @@ function ViewCliente({ data, contratti, stats }) {
                       <td className="px-2 py-2 text-text-muted">
                         {isAperto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </td>
-                      <td className="px-4 py-2 text-text-muted tabular-nums">{formatDate(c.data_sottoscrizione)}</td>
+                      <td className="px-4 py-2 tabular-nums">
+                        {/* Data stipula in evidenza + data registrazione sotto */}
+                        <div className="text-white">{formatDate(c.data_stipula || c.data_sottoscrizione)}</div>
+                        {c.data_stipula && c.data_stipula !== c.data_sottoscrizione && (
+                          <div className="text-[11px] text-text-muted">reg. {formatDate(c.data_sottoscrizione)}</div>
+                        )}
+                      </td>
                       <td className="px-4 py-2 text-white tabular-nums break-all">
                         {c.codice_contratto || <span className="text-warning">—</span>}
                       </td>

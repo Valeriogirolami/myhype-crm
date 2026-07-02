@@ -23,6 +23,7 @@ import Badge from '@/components/ui/Badge'
 import Select from '@/components/ui/Select'
 import Input from '@/components/ui/Input'
 import MesePicker from '@/components/ui/MesePicker'
+import DatePicker from '@/components/ui/DatePicker'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
@@ -132,6 +133,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       note: data.note || '',
       note_bo: data.note_bo || '',
       codice_contratto: data.codice_contratto || '',
+      data_stipula: data.data_stipula || '',
       mese_gettonamento: dateToYM(data.mese_gettonamento),
       mese_storno: dateToYM(data.mese_storno),
       venditore_id: data.venditore?.id || '',
@@ -325,8 +327,9 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       // Notifica Top 3 (§10.4 / §13) — se il contratto è (o resta) in stato produttivo,
       // ricalcolo le top 3 del mese e mando notifiche ai nuovi entranti
       const statiProduttivi = ['validato', 'gettonato', 'stornato']
-      if (statiProduttivi.includes(updates.stato) && data.data_sottoscrizione) {
-        const ym = data.data_sottoscrizione.slice(0, 7)
+      if (statiProduttivi.includes(updates.stato) && (data.data_stipula || data.data_sottoscrizione)) {
+        // Uso data_stipula come mese di competenza (data commercialmente rilevante)
+        const ym = (data.data_stipula || data.data_sottoscrizione).slice(0, 7)
         notificaTop3PerMese(ym)  // fire-and-forget, non blocca il salvataggio
       }
 
@@ -430,12 +433,17 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       if (!form.codice_contratto?.trim()) {
         throw new Error('Il Codice Contratto è obbligatorio')
       }
+      // Data stipula obbligatoria (Admin/BO possono modificarla senza limiti)
+      if (!form.data_stipula) {
+        throw new Error('La Data stipula è obbligatoria')
+      }
       const nuovoStato = form.stato
       const updates = {
         stato: nuovoStato,
         note: form.note?.trim() || null,
         note_bo: form.note_bo?.trim() || null,
         codice_contratto: form.codice_contratto.trim(),
+        data_stipula: form.data_stipula,
         venditore_id: form.venditore_id || null,
         prodotto: form.prodotto,
         motivo_ko_non_validato: null,
@@ -571,9 +579,11 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       }
 
       // Notifica Top 3 (§10.4) anche dopo modifica completa
+      // Uso data_stipula (aggiornata) come mese di competenza commerciale
       const statiProduttivi = ['validato', 'gettonato', 'stornato']
-      if (statiProduttivi.includes(nuovoStato) && data.data_sottoscrizione) {
-        const ym = data.data_sottoscrizione.slice(0, 7)
+      const dataMese = updates.data_stipula || data.data_stipula || data.data_sottoscrizione
+      if (statiProduttivi.includes(nuovoStato) && dataMese) {
+        const ym = dataMese.slice(0, 7)
         notificaTop3PerMese(ym)
       }
 
@@ -684,8 +694,14 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                 </InfoBlock>
 
                 <InfoBlock icon={Calendar} label="Date">
-                  <div className="text-xs text-text-muted">Sottoscrizione</div>
-                  <div className="text-white">{formatDate(data.data_sottoscrizione)}</div>
+                  {/* Data stipula = data commercialmente rilevante (in evidenza) */}
+                  <div className="text-xs text-text-muted">Stipulato il</div>
+                  <div className="text-white font-medium">
+                    {data.data_stipula ? formatDate(data.data_stipula) : <span className="text-warning">— da compilare —</span>}
+                  </div>
+                  {/* Data registrazione = quando è stato inserito nel CRM (informativa) */}
+                  <div className="mt-1 text-xs text-text-muted">Registrato il</div>
+                  <div className="text-text-muted text-sm">{formatDate(data.data_sottoscrizione)}</div>
                   {data.mese_gettonamento && (
                     <>
                       <div className="mt-1 text-xs text-text-muted">Competenza gettonamento</div>
@@ -858,6 +874,24 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                   value={form.codice_contratto}
                   onChange={e => setF('codice_contratto', e.target.value)}
                 />
+
+                {/* Data stipula — modificabile da Admin/BO senza limiti (2026-07-03).
+                    Il PdV non entra in questa modalità di modifica; per lui la
+                    validazione dei 5 giorni sta nel form Nuovo Contratto. */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-text-muted">
+                    Data stipula <span className="text-danger">*</span>
+                  </label>
+                  <DatePicker
+                    value={form.data_stipula}
+                    onChange={v => setF('data_stipula', v)}
+                    placeholder="Seleziona data"
+                  />
+                  <p className="mt-1 text-xs text-text-muted">
+                    Data reale di stipula. Il BO può modificarla senza vincoli.
+                    La data di registrazione ({formatDate(data.data_sottoscrizione)}) invece è immutabile.
+                  </p>
+                </div>
 
                 <Select label="Stato" required value={form.stato} onChange={e => setF('stato', e.target.value)}>
                   {STATI_MODIFICABILI.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
@@ -1348,6 +1382,7 @@ function emptyForm() {
     note: '',
     note_bo: '',
     codice_contratto: '',
+    data_stipula: '',
     mese_gettonamento: '',
     mese_storno: '',
     venditore_id: '',

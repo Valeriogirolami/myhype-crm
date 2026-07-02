@@ -21,14 +21,16 @@ export async function fetchContrattiPerClassifiche(ym, opzioni = {}) {
   let q = supabase
     .from('contratti')
     .select(`
-      id, prodotto, stato, data_sottoscrizione,
+      id, prodotto, stato, data_stipula, data_sottoscrizione,
       fatturato_pdv_snap, punti_snap,
       pdv:pdv(id, nome, tipo, area, categoria, account_id),
       venditore:collaboratori(id, nome, cognome, ruolo, account_id),
       contratto_sottoprodotti(sottoprodotti(punti, fatturato_pdv))
     `)
-    .gte('data_sottoscrizione', start)
-    .lte('data_sottoscrizione', end)
+    // Le classifiche si calcolano sulla DATA STIPULA (commercialmente rilevante),
+    // NON sulla data di registrazione a sistema.
+    .gte('data_stipula', start)
+    .lte('data_stipula', end)
     .in('stato', ['validato', 'gettonato', 'stornato'])
   if (opzioni.pdvIds && opzioni.pdvIds.length > 0) {
     q = q.in('pdv_id', opzioni.pdvIds)

@@ -95,7 +95,7 @@ export default function Contratti() {
     let q = supabase
       .from('contratti')
       .select(`
-        id, data_sottoscrizione, stato, prodotto, codice_contratto,
+        id, data_stipula, data_sottoscrizione, stato, prodotto, codice_contratto,
         note, note_bo, mese_gettonamento, mese_storno,
         motivo_ko_non_validato, motivo_ko, note_ko,
         fatturato_pdv_snap, punti_snap, fatturato_azienda_snap,
@@ -107,7 +107,9 @@ export default function Contratti() {
         venditore:collaboratori(id, nome, cognome),
         contratto_sottoprodotti(sottoprodotti(id, nome, punti, fatturato_pdv, fatturato_azienda))
       `)
-      .order('data_sottoscrizione', { ascending: false })
+      // Ordino per data STIPULA (data commercialmente rilevante), non per data
+      // di registrazione: uso lo stesso criterio delle statistiche.
+      .order('data_stipula', { ascending: false })
 
     // Scope §11: PdV/AS/TM vedono solo i contratti dei loro PdV
     if (Array.isArray(scopeIds)) {
@@ -180,8 +182,9 @@ export default function Contratti() {
           if (r.mese_gettonamento !== filterMeseGettona) return false
         }
       }
-      if (dateFrom && r.data_sottoscrizione < dateFrom) return false
-      if (dateTo && r.data_sottoscrizione > dateTo) return false
+      // Filtro date "da/a" applicato sulla DATA STIPULA (coerente con statistiche)
+      if (dateFrom && r.data_stipula < dateFrom) return false
+      if (dateTo && r.data_stipula > dateTo) return false
       if (q) {
         const blob = [
           r.cliente?.nome, r.cliente?.cognome, r.cliente?.ragione_sociale,
@@ -235,7 +238,8 @@ export default function Contratti() {
 
     const riga = {
       // === CONTRATTO ===
-      'Data sottoscrizione': formatDate(r.data_sottoscrizione),
+      'Data stipula': formatDate(r.data_stipula),
+      'Data registrazione': formatDate(r.data_sottoscrizione),
       'Codice Contratto': r.codice_contratto || '',
       'Stato': STATI[r.stato]?.label || r.stato,
 
@@ -505,7 +509,7 @@ export default function Contratti() {
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <Calendar size={14} className="text-text-muted" />
-            <span className="text-text-muted">Sottoscrizione:</span>
+            <span className="text-text-muted">Stipula:</span>
             <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="da..." />
             <span className="text-text-muted">→</span>
             <DatePicker value={dateTo} onChange={setDateTo} placeholder="a..." minDate={dateFrom || undefined} />
@@ -584,7 +588,7 @@ export default function Contratti() {
                       )}
                     </th>
                   )}
-                  <th className="px-5 py-3 font-medium">Data</th>
+                  <th className="px-5 py-3 font-medium">Stipulato / Registrato</th>
                   <th className="px-5 py-3 font-medium">Cliente</th>
                   <th className="px-5 py-3 font-medium">PdV</th>
                   <th className="px-5 py-3 font-medium">Venditore</th>
@@ -633,8 +637,12 @@ export default function Contratti() {
                           ) : null}
                         </td>
                       )}
-                      <td className="px-5 py-3 text-text-muted tabular-nums">
-                        {formatDate(r.data_sottoscrizione)}
+                      <td className="px-5 py-3 tabular-nums">
+                        {/* Data stipula in evidenza; data registrazione secondaria */}
+                        <div className="text-white">{formatDate(r.data_stipula)}</div>
+                        <div className="text-[11px] text-text-muted">
+                          reg. {formatDate(r.data_sottoscrizione)}
+                        </div>
                       </td>
                       <td className="px-5 py-3">
                         <div className="font-medium text-white">{nomeCliente(r.cliente)}</div>

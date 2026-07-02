@@ -66,13 +66,16 @@ export default function Clienti() {
       if (ids.length > 0) {
         const { data: ctr } = await supabase
           .from('contratti')
-          .select('cliente_id, data_sottoscrizione')
+          .select('cliente_id, data_stipula, data_sottoscrizione')
           .in('cliente_id', ids)
         for (const c of ctr || []) {
           countMap.set(c.cliente_id, (countMap.get(c.cliente_id) || 0) + 1)
+          // "Ultimo contratto" del cliente = quello con la data stipula
+          // più recente (fallback su registrazione per contratti storici)
+          const dataConfronto = c.data_stipula || c.data_sottoscrizione
           const prev = lastDateMap.get(c.cliente_id)
-          if (!prev || c.data_sottoscrizione > prev) {
-            lastDateMap.set(c.cliente_id, c.data_sottoscrizione)
+          if (!prev || dataConfronto > prev) {
+            lastDateMap.set(c.cliente_id, dataConfronto)
           }
         }
       }

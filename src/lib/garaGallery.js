@@ -95,7 +95,7 @@ export function calcolaPdvGaraGallery(pdv, contrattiMese, contrattiAttualizzati,
   const mesiVita = mesiVitaPdv(pdv.data_apertura, ym)
   const fattore = fattoreSogliaPrimiMesi(mesiVita)
 
-  // Punti previsti = validati con data_sottoscrizione nel mese (escludo già gettonati)
+  // Punti previsti = validati con data_stipula nel mese (escludo già gettonati)
   const punti_attuali = contrattiMese
     .filter(c => c.pdv?.id === pdv.id && c.stato === 'validato')
     .reduce((s, c) => s + totaleContratto(c).punti, 0)

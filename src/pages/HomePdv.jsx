@@ -80,7 +80,7 @@ export default function HomePdv() {
       const { data: ultimi, error: errUlt } = await supabase
         .from('contratti')
         .select(`
-          id, data_sottoscrizione, prodotto, stato,
+          id, data_stipula, data_sottoscrizione, prodotto, stato,
           fatturato_pdv_snap, punti_snap,
           cliente:clienti(id, nome, cognome, ragione_sociale, categoria, codice_fiscale),
           venditore:collaboratori(id, nome, cognome),
@@ -329,7 +329,7 @@ function UltimiContrattiCard({ ultimi }) {
                     {prodMeta && <Badge tone={prodMeta.tone} className="text-[9px]">{prodMeta.label}</Badge>}
                   </div>
                   <div className="text-[11px] text-text-muted">
-                    {formatDate(c.data_sottoscrizione)}
+                    {formatDate(c.data_stipula || c.data_sottoscrizione)}
                     {c.venditore && ` · ${c.venditore.nome} ${c.venditore.cognome}`}
                   </div>
                 </div>
