@@ -89,6 +89,7 @@ create table public.collaboratori (
   email           text,
   iban            text,
   data_assunzione date,
+  data_scadenza_contratto date,             -- NULL = indeterminato (∞); usato dalla pagina "Contratti in scadenza"
   regime_fiscale  regime_fiscale,
   ruolo           text not null,             -- Venditore / Venditore Senior / TM / AS / DV ...
   stato           stato_collaboratore not null default 'attivo',

@@ -7,7 +7,7 @@
  * - Admin/BO creano e modificano (§11)
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Loader2, UserCog, ExternalLink, Filter, KeyRound, CheckCircle2 } from 'lucide-react'
+import { Plus, Search, Loader2, UserCog, ExternalLink, Filter, KeyRound, CheckCircle2, AlertTriangle, Infinity as InfinityIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
@@ -242,10 +242,33 @@ export default function Collaboratori() {
                             {iniziali || '??'}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-medium">{c.nome} {c.cognome}</div>
+                            <div className="flex items-center gap-1.5 font-medium">
+                              {c.nome} {c.cognome}
+                              {/* Alert su collaboratori attivi senza scadenza contratto (pregressi §2026-07) */}
+                              {c.stato === 'attivo' && !c.data_scadenza_contratto && (
+                                <span
+                                  title="Attenzione, nessuna scadenza contratto inserita"
+                                  className="inline-flex items-center text-warning"
+                                >
+                                  <AlertTriangle size={13} />
+                                </span>
+                              )}
+                            </div>
                             {c.codice_fiscale && (
                               <div className="text-[11px] tabular-nums text-text-muted">
                                 {c.codice_fiscale}
+                              </div>
+                            )}
+                            {/* Riga scadenza contratto (visibile solo se attivo) */}
+                            {c.stato === 'attivo' && (
+                              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-text-muted">
+                                {c.data_scadenza_contratto ? (
+                                  <>Scad. {new Date(c.data_scadenza_contratto).toLocaleDateString('it-IT')}</>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-warning">
+                                    Nessuna scadenza inserita
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>

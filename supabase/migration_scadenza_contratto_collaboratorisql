@@ -1,0 +1,18 @@
+-- ============================================================================
+-- MyHype — Migrazione: data scadenza contratto sui collaboratori
+-- ============================================================================
+-- Richiesta Valerio (2026-07):
+--   Ogni collaboratore ha una data di scadenza contratto (o "indeterminato").
+--   NULL sul DB = indeterminato (contratto ∞).
+--   Verrà usata dalla nuova pagina "Contratti in scadenza" per
+--   raggruppare per urgenza (prossimo mese / questo mese / questa settimana /
+--   scaduti) e per l'alert 'nessuna scadenza inserita' sui pregressi.
+-- ============================================================================
+
+ALTER TABLE public.collaboratori
+  ADD COLUMN IF NOT EXISTS data_scadenza_contratto date;
+
+-- Indice per query per range di scadenza (nella pagina "Contratti in scadenza")
+CREATE INDEX IF NOT EXISTS idx_collaboratori_scadenza
+  ON public.collaboratori(data_scadenza_contratto)
+  WHERE data_scadenza_contratto IS NOT NULL;

@@ -20,6 +20,7 @@ import GaraGallery from './pages/GaraGallery'
 import Simulatore from './pages/Simulatore'
 import Organigramma from './pages/Organigramma'
 import Admin from './pages/Admin'
+import ContrattiScadenza from './pages/ContrattiScadenza'
 import Placeholder from './pages/Placeholder'
 
 export default function App() {
@@ -41,12 +42,14 @@ export default function App() {
             <Route path="*"            element={<Placeholder title="404"           description="Pagina non trovata." step="—" />} />
           </Route>
 
-          {/* Area PdV / Collaboratori — non accessibile al ruolo 'pdv' (§11).
-              HR (2026-07) può vedere le anagrafiche ma non modificarle. */}
+          {/* Area PdV / Collaboratori / Contratti in scadenza — non accessibile
+              al ruolo 'pdv' (§11). HR (2026-07) può vedere le anagrafiche ma
+              non modificarle. */}
           <Route element={<ProtectedRoute roles={['admin','bo','dv','as','tm','hr']} />}>
             <Route element={<Layout />}>
-              <Route path="pdv"           element={<Pdv />} />
-              <Route path="collaboratori" element={<Collaboratori />} />
+              <Route path="pdv"                  element={<Pdv />} />
+              <Route path="collaboratori"        element={<Collaboratori />} />
+              <Route path="contratti-scadenza"   element={<ContrattiScadenza />} />
             </Route>
           </Route>
 

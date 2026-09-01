@@ -11,11 +11,11 @@
  * Nota §3.3: la disattivazione di un VENDITORE deve generare alert al BO.
  * Per ora la registriamo solo. L'alert vero arriverà nello Step 14 (notifiche).
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Infinity as InfinityIcon } from 'lucide-react'
 import Dialog from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -38,6 +38,8 @@ const schema = z.object({
   email:           z.string().email('Email non valida').optional().or(z.literal('')),
   iban:            z.string().max(34).optional().or(z.literal('')),
   data_assunzione: z.string().optional().or(z.literal('')),
+  // Scadenza contratto: stringa YYYY-MM-DD OPPURE vuota (= indeterminato, salvata come NULL)
+  data_scadenza_contratto: z.string().optional().or(z.literal('')),
   regime_fiscale:  z.enum(['ritenuta_acconto','cococo','p_iva','assunto']).optional().or(z.literal('')),
   ruolo:           z.string().min(1, 'Obbligatorio'),
   stato:           z.enum(['attivo', 'disattivato']),
@@ -55,6 +57,7 @@ const defaultValues = {
   email: '',
   iban: '',
   data_assunzione: '',
+  data_scadenza_contratto: '',
   regime_fiscale: '',
   ruolo: 'Venditore',
   stato: 'attivo',
@@ -69,10 +72,29 @@ export default function CollaboratoreDialog({ open, onClose, collaboratore, onSa
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(schema), defaultValues })
 
   const linkDrive = watch('link_drive')
+  const scadenzaValore = watch('data_scadenza_contratto')
+
+  // Stato locale del toggle "Indeterminato": true = contratto ∞ (nessuna data),
+  // false = data specifica. Inizializzato in base al valore corrente.
+  const [scadenzaIndeterminata, setScadenzaIndeterminata] = useState(false)
+
+  // Quando cambio collaboratore/apro dialog, allineo il toggle allo stato reale:
+  // se il collaboratore ha data null → toggle ON (indeterminato)
+  // se ha una data → toggle OFF (specifica)
+  useEffect(() => {
+    if (!open) return
+    if (collaboratore) {
+      setScadenzaIndeterminata(!collaboratore.data_scadenza_contratto)
+    } else {
+      // Nuovo collaboratore: default indeterminato spento (l'utente sceglierà)
+      setScadenzaIndeterminata(false)
+    }
+  }, [open, collaboratore])
 
   useEffect(() => {
     if (!open) return
@@ -89,6 +111,7 @@ export default function CollaboratoreDialog({ open, onClose, collaboratore, onSa
             email:           collaboratore.email ?? '',
             iban:            collaboratore.iban ?? '',
             data_assunzione: collaboratore.data_assunzione ?? '',
+            data_scadenza_contratto: collaboratore.data_scadenza_contratto ?? '',
             regime_fiscale:  collaboratore.regime_fiscale ?? '',
             ruolo:           collaboratore.ruolo ?? 'Venditore',
             stato:           collaboratore.stato ?? 'attivo',
@@ -279,6 +302,39 @@ export default function CollaboratoreDialog({ open, onClose, collaboratore, onSa
               error={errors.data_assunzione?.message}
               {...register('data_assunzione')}
             />
+
+            {/* Scadenza contratto — obbligatoria per i nuovi (§2026-07).
+                Toggle "Indeterminato" mostra ∞ e salva NULL sul DB. */}
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-text-muted">
+                Data scadenza contratto
+              </label>
+              {scadenzaIndeterminata ? (
+                <div className="flex h-[38px] items-center rounded-xl border border-border bg-bg/30 px-3 text-sm text-text-muted">
+                  <InfinityIcon size={16} className="mr-2 text-accent-2" />
+                  Contratto a tempo indeterminato
+                </div>
+              ) : (
+                <Input
+                  type="date"
+                  error={errors.data_scadenza_contratto?.message}
+                  {...register('data_scadenza_contratto')}
+                />
+              )}
+              <label className="mt-1.5 inline-flex cursor-pointer items-center gap-2 text-xs text-text-muted">
+                <input
+                  type="checkbox"
+                  checked={scadenzaIndeterminata}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    setScadenzaIndeterminata(on)
+                    if (on) setValue('data_scadenza_contratto', '')
+                  }}
+                  className="accent-accent"
+                />
+                <span>Indeterminato <InfinityIcon size={12} className="inline" /></span>
+              </label>
+            </div>
 
             <Select
               label="Stato"
