@@ -133,3 +133,58 @@ body {
   margin: 0 auto;
   background: var(--color-border);
 }
+
+/* =============================================================================
+ * Animazioni per AugurioCompleanno — banner pirotecnico (§2026-07)
+ * ============================================================================= */
+
+/* Gradient rainbow che scorre lentamente sul banner */
+@keyframes augurio-gradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-augurio-gradient {
+  animation: augurio-gradient 8s ease infinite;
+}
+
+/* Alone pulsante attorno al bordo */
+@keyframes augurio-glow {
+  0%, 100% { box-shadow: inset 0 0 20px rgba(255,255,255,0.15), 0 0 40px rgba(255,255,255,0.25); }
+  50%      { box-shadow: inset 0 0 40px rgba(255,255,255,0.30), 0 0 80px rgba(255,255,255,0.45); }
+}
+.animate-augurio-glow {
+  animation: augurio-glow 2.5s ease-in-out infinite;
+}
+
+/* Caduta confetti dall'alto verso il basso con leggera oscillazione */
+@keyframes augurio-fall {
+  0% {
+    transform: translateY(-20px) translateX(0) rotate(var(--rotStart, 0deg));
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(220px) translateX(20px) rotate(var(--rotEnd, 720deg));
+    opacity: 0;
+  }
+}
+.animate-augurio-fall {
+  animation-name: augurio-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Shimmer sul testo "Tanti auguri" */
+@keyframes augurio-shimmer {
+  0%, 100% { opacity: 0.85; text-shadow: 0 0 6px rgba(255,255,255,0.4); }
+  50%      { opacity: 1;    text-shadow: 0 0 16px rgba(255,255,255,0.9); }
+}
+.animate-augurio-shimmer {
+  animation: augurio-shimmer 1.8s ease-in-out infinite;
+}

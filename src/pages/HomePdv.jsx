@@ -32,6 +32,8 @@ import {
 } from '@/lib/dashboard'
 import { classificaVenditori } from '@/lib/classifiche'
 import ContrattoNuovoDialog from './ContrattoNuovoDialog'
+import AugurioCompleanno from '@/components/AugurioCompleanno'
+import { fetchCompleanniOggi } from '@/lib/compleanni'
 
 const PRODOTTI_VIS = [
   { v: 'mobile',  l: 'Mobile',  icon: Smartphone, color: 'accent' },
@@ -49,6 +51,13 @@ export default function HomePdv() {
   const [contratti, setContratti] = useState([])
   const [ultimi10, setUltimi10] = useState([])
   const [target, setTarget] = useState({ mobile: 0, fisso: 0, energia: 0 })
+
+  // Compleanni di oggi (solo collaboratori del mio PdV)
+  const [festeggiati, setFesteggiati] = useState([])
+  useEffect(() => {
+    if (!profile?.id) return
+    fetchCompleanniOggi(profile).then(setFesteggiati)
+  }, [profile?.id])
 
   async function fetchAll() {
     setLoading(true)
@@ -150,6 +159,9 @@ export default function HomePdv() {
 
   return (
     <div>
+      {/* Banner compleanno pirotecnico — solo collaboratori del proprio PdV */}
+      <AugurioCompleanno festeggiati={festeggiati} />
+
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

@@ -28,6 +28,8 @@ import {
 import { getPdvScopeIds } from '@/lib/classifiche'
 import { checkContrattiFermiBO } from '@/lib/notifiche'
 import HomePdv from './HomePdv'
+import AugurioCompleanno from '@/components/AugurioCompleanno'
+import { fetchCompleanniOggi } from '@/lib/compleanni'
 
 const PRODOTTI = [
   { v: 'mobile',  l: 'Mobile',  color: '#2B6CFF' },
@@ -74,6 +76,13 @@ function HomeAdmin() {
 
   // Medie globali (solo Admin): caricate una sola volta a init pagina
   const [medie, setMedie] = useState(null)
+
+  // Compleanni di oggi (Admin/BO NON li vedono — handler lato helper)
+  const [festeggiati, setFesteggiati] = useState([])
+  useEffect(() => {
+    if (!profile?.id) return
+    fetchCompleanniOggi(profile).then(setFesteggiati)
+  }, [profile?.id])
 
   async function fetchAll() {
     setLoading(true)
@@ -192,6 +201,10 @@ function HomeAdmin() {
 
   return (
     <div>
+      {/* Banner compleanno pirotecnico — visibile solo se ci sono festeggiati oggi.
+          Admin/BO sono esclusi lato helper (nessun fetch). */}
+      <AugurioCompleanno festeggiati={festeggiati} />
+
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
