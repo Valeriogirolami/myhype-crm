@@ -2,7 +2,7 @@
  * Dialog (modale) portalizzato nel <body>.
  * Backdrop scuro + card centrata, animazione soft con Framer Motion.
  * - ESC chiude
- * - Click sul backdrop chiude
+ * - Click sul backdrop chiude (disattivabile con dismissOnBackdrop={false})
  * - Body non scrolla mentre è aperto
  */
 import { useEffect } from 'react'
@@ -19,6 +19,10 @@ export default function Dialog({
   children,
   footer,
   size = 'md', // sm / md / lg
+  // Se false, il click sul backdrop NON chiude il dialog (utile per form
+  // multi-step dove un click accidentale fuori farebbe perdere il lavoro).
+  // Default true = comportamento storico.
+  dismissOnBackdrop = true,
 }) {
   // ESC chiude + blocca scroll body
   useEffect(() => {
@@ -45,7 +49,7 @@ export default function Dialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            onClick={onClose}
+            onClick={dismissOnBackdrop ? onClose : undefined}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
 

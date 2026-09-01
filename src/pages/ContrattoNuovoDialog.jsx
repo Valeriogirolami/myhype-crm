@@ -393,6 +393,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
       <Dialog
         open={open}
         onClose={onClose}
+        dismissOnBackdrop={false}
         size="md"
         title="Contratto creato"
         description="Il contratto è stato inserito correttamente ed è ora in stato 'Da validare'."
@@ -432,6 +433,7 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
     <Dialog
       open={open}
       onClose={onClose}
+      dismissOnBackdrop={false}
       size="lg"
       title="Nuovo contratto"
       description="Inserisci cliente, prodotto e chi ha venduto. Il contratto partirà in stato 'Da validare'."
