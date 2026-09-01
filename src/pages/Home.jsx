@@ -183,6 +183,7 @@ function HomeAdmin() {
     admin: { titolo: 'Dashboard Admin',                      scope: 'Panoramica intera rete' },
     bo:    { titolo: 'Dashboard Back Office',                scope: 'Panoramica intera rete' },
     dv:    { titolo: 'Dashboard Direzione Vendite',          scope: 'Panoramica intera rete' },
+    hr:    { titolo: 'Dashboard Responsabile HR',            scope: 'Panoramica intera rete' },
     as:    { titolo: 'Dashboard Area Sales',                 scope: 'Solo i tuoi PdV' },
     tm:    { titolo: 'Dashboard Team Manager',               scope: 'Solo i tuoi PdV' },
   }
@@ -235,15 +236,13 @@ function HomeAdmin() {
               value={formatInt(totPunti)}
               hint="Validati / Gettonati / Stornati"
             />
-            {/* HR (2026-07) non vede fatturati */}
-            {!isHr && (
-              <KpiCard
-                icon={Coins}
-                label={isAdmin ? 'Fatturato Azienda previsto' : 'Fatturato previsto'}
-                value={formatEuro(fattPrevisto)}
-                hint={isAdmin ? 'Somma fatturato Azienda dei validati' : 'Somma fatturato PdV dei validati'}
-              />
-            )}
+            {/* HR vede il fatturato PdV come il DV (allineato 2026-07). */}
+            <KpiCard
+              icon={Coins}
+              label={isAdmin ? 'Fatturato Azienda previsto' : 'Fatturato previsto'}
+              value={formatEuro(fattPrevisto)}
+              hint={isAdmin ? 'Somma fatturato Azienda dei validati' : 'Somma fatturato PdV dei validati'}
+            />
             <KpiCard
               icon={TargetIcon}
               label="Scostamento target"
