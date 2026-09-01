@@ -92,8 +92,9 @@ Deno.serve(async (req: Request) => {
 
     const callerRows = await pgrest('GET', `utenti?id=eq.${user.id}&select=ruolo,attivo`) as Array<{ruolo: string, attivo: boolean}>
     const caller = callerRows?.[0]
-    if (!caller?.attivo || !['admin', 'bo'].includes(caller.ruolo)) {
-      return json({ error: 'Solo Admin o BO possono resettare password' }, 403)
+    // Admin, BO e HR possono resettare password (HR aggiunto 2026-07)
+    if (!caller?.attivo || !['admin', 'bo', 'hr'].includes(caller.ruolo)) {
+      return json({ error: 'Solo Admin, BO o HR possono resettare password' }, 403)
     }
 
     const body = await req.json()
@@ -102,6 +103,16 @@ Deno.serve(async (req: Request) => {
     if (!user_id) return json({ error: 'user_id mancante' }, 400)
     if (new_password.length < 8) {
       return json({ error: 'La password deve avere almeno 8 caratteri' }, 400)
+    }
+
+    // Sicurezza: solo Admin può resettare password di altri Admin
+    if (caller.ruolo !== 'admin') {
+      const targetRows = await pgrest(
+        'GET', `utenti?id=eq.${user_id}&select=ruolo`
+      ) as Array<{ ruolo: string }>
+      if (targetRows?.[0]?.ruolo === 'admin') {
+        return json({ error: 'Solo un Admin può resettare la password di un altro Admin' }, 403)
+      }
     }
 
     await authAdmin('PUT', `users/${user_id}`, { password: new_password })

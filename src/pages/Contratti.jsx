@@ -53,6 +53,8 @@ export default function Contratti() {
   const isAdmin = profile?.ruolo === 'admin'
   const isPdv = profile?.ruolo === 'pdv'
   const isAsTm = ['as','tm'].includes(profile?.ruolo)
+  // HR: sola visualizzazione senza vedere fatturati/soldi (2026-07)
+  const isHr = profile?.ruolo === 'hr'
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -428,7 +430,8 @@ export default function Contratti() {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {/* Export Excel del filtrato — solo Admin/BO */}
+          {/* Export Excel del filtrato — solo Admin/BO. HR NON è in isBoAdmin,
+              quindi non vede questi bottoni (bene: contengono fatturati). */}
           {isBoAdmin && (
             <Button variant="secondary" onClick={esportaFiltrati} loading={exporting}>
               <Download size={16} />
@@ -594,7 +597,8 @@ export default function Contratti() {
                   <th className="px-5 py-3 font-medium">Venditore</th>
                   <th className="px-5 py-3 font-medium">Prodotto</th>
                   <th className="px-5 py-3 font-medium text-right">Punti</th>
-                  <th className="px-5 py-3 font-medium text-right">Fatt. PdV</th>
+                  {/* HR non vede fatturato PdV (2026-07) */}
+                  {!isHr && <th className="px-5 py-3 font-medium text-right">Fatt. PdV</th>}
                   <th className="px-5 py-3 font-medium">Stato</th>
                   <th className="px-5 py-3 font-medium">Gettonato</th>
                 </tr>
@@ -658,7 +662,8 @@ export default function Contratti() {
                         {prodottoMeta && <Badge tone={prodottoMeta.tone}>{prodottoMeta.label}</Badge>}
                       </td>
                       <td className="px-5 py-3 text-right text-white tabular-nums">{formatInt(puntiMostr)}</td>
-                      <td className="px-5 py-3 text-right text-white tabular-nums">{formatEuro(fattMostr)}</td>
+                      {/* HR non vede il fatturato PdV (2026-07) */}
+                      {!isHr && <td className="px-5 py-3 text-right text-white tabular-nums">{formatEuro(fattMostr)}</td>}
                       <td className="px-5 py-3">
                         {statoMeta && <Badge tone={statoMeta.tone}>{statoMeta.label}</Badge>}
                       </td>

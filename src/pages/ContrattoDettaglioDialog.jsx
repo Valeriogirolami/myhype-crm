@@ -45,6 +45,8 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
   const isAdmin = profile?.ruolo === 'admin'
   const isBoAdmin = ['admin', 'bo'].includes(profile?.ruolo)
   const isPdv = profile?.ruolo === 'pdv'
+  // HR: sola visualizzazione senza vedere fatturati (2026-07)
+  const isHr = profile?.ruolo === 'hr'
 
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
@@ -734,8 +736,9 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                       <tr className="text-left text-xs uppercase tracking-wide text-text-muted">
                         <th className="px-4 py-2 font-medium">Nome</th>
                         <th className="px-4 py-2 font-medium">Punti</th>
+                        {/* Fatt. Azienda: solo Admin. Fatt. PdV: tutti tranne HR (2026-07) */}
                         {isAdmin && <th className="px-4 py-2 font-medium">Fatt. Azienda</th>}
-                        <th className="px-4 py-2 font-medium">Fatt. PdV</th>
+                        {!isHr && <th className="px-4 py-2 font-medium">Fatt. PdV</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -744,7 +747,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                           <td className="px-4 py-2 text-white">{sp.nome}</td>
                           <td className="px-4 py-2 text-white tabular-nums">{formatInt(sp.punti)}</td>
                           {isAdmin && <td className="px-4 py-2 text-white tabular-nums">{formatEuro(sp.fatturato_azienda)}</td>}
-                          <td className="px-4 py-2 text-white tabular-nums">{formatEuro(sp.fatturato_pdv)}</td>
+                          {!isHr && <td className="px-4 py-2 text-white tabular-nums">{formatEuro(sp.fatturato_pdv)}</td>}
                         </tr>
                       ))}
                     </tbody>
@@ -758,13 +761,13 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
                           <>
                             <td className="px-4 py-2 text-white tabular-nums">{formatInt(data.punti_snap ?? totali.punti)}</td>
                             {isAdmin && <td className="px-4 py-2 text-white tabular-nums">{formatEuro(data.fatturato_azienda_snap ?? totali.fatturato_azienda)}</td>}
-                            <td className="px-4 py-2 text-white tabular-nums">{formatEuro(data.fatturato_pdv_snap ?? totali.fatturato_pdv)}</td>
+                            {!isHr && <td className="px-4 py-2 text-white tabular-nums">{formatEuro(data.fatturato_pdv_snap ?? totali.fatturato_pdv)}</td>}
                           </>
                         ) : (
                           <>
                             <td className="px-4 py-2 text-white tabular-nums">{formatInt(totali.punti)}</td>
                             {isAdmin && <td className="px-4 py-2 text-white tabular-nums">{formatEuro(totali.fatturato_azienda)}</td>}
-                            <td className="px-4 py-2 text-white tabular-nums">{formatEuro(totali.fatturato_pdv)}</td>
+                            {!isHr && <td className="px-4 py-2 text-white tabular-nums">{formatEuro(totali.fatturato_pdv)}</td>}
                           </>
                         )}
                       </tr>

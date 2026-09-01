@@ -12,7 +12,7 @@ create extension if not exists "pgcrypto";
 -- ENUM: tipologie chiuse (Postgres enum — più efficienti di varchar + check)
 -- ============================================================================
 
-create type ruolo_utente as enum ('admin','bo','dv','as','tm','pdv');
+create type ruolo_utente as enum ('admin','bo','dv','as','tm','pdv','hr');
 create type tipo_pdv     as enum ('sinergia','galleria');
 create type categoria_pdv as enum ('A','B','C','D');
 create type stato_pdv    as enum ('aperto','chiuso');

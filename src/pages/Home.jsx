@@ -57,6 +57,8 @@ export default function Home() {
 function HomeAdmin() {
   const { profile } = useAuth()
   const isAdmin = profile?.ruolo === 'admin'
+  // HR: sola visualizzazione senza fatturati (2026-07)
+  const isHr = profile?.ruolo === 'hr'
   const ruolo = profile?.ruolo
 
   const [meseSel, setMeseSel] = useState(currentYM())
@@ -233,12 +235,15 @@ function HomeAdmin() {
               value={formatInt(totPunti)}
               hint="Validati / Gettonati / Stornati"
             />
-            <KpiCard
-              icon={Coins}
-              label={isAdmin ? 'Fatturato Azienda previsto' : 'Fatturato previsto'}
-              value={formatEuro(fattPrevisto)}
-              hint={isAdmin ? 'Somma fatturato Azienda dei validati' : 'Somma fatturato PdV dei validati'}
-            />
+            {/* HR (2026-07) non vede fatturati */}
+            {!isHr && (
+              <KpiCard
+                icon={Coins}
+                label={isAdmin ? 'Fatturato Azienda previsto' : 'Fatturato previsto'}
+                value={formatEuro(fattPrevisto)}
+                hint={isAdmin ? 'Somma fatturato Azienda dei validati' : 'Somma fatturato PdV dei validati'}
+              />
+            )}
             <KpiCard
               icon={TargetIcon}
               label="Scostamento target"

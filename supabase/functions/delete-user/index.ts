@@ -96,8 +96,9 @@ Deno.serve(async (req: Request) => {
     ) as Array<{ ruolo: string, attivo: boolean }>
     const caller = callerRows?.[0]
     if (!caller?.attivo) return json({ error: 'Account chiamante non attivo' }, 403)
-    if (!['admin', 'bo'].includes(caller.ruolo)) {
-      return json({ error: 'Solo Admin o BO possono eliminare account' }, 403)
+    // Admin, BO e HR possono eliminare account (HR aggiunto 2026-07)
+    if (!['admin', 'bo', 'hr'].includes(caller.ruolo)) {
+      return json({ error: 'Solo Admin, BO o HR possono eliminare account' }, 403)
     }
 
     // Input
@@ -116,8 +117,9 @@ Deno.serve(async (req: Request) => {
     ) as Array<{ ruolo: string, email: string }>
     const target = targetRows?.[0]
     if (!target) return json({ error: 'Account da eliminare non trovato' }, 404)
-    if (caller.ruolo === 'bo' && target.ruolo === 'admin') {
-      return json({ error: 'Il BO non può eliminare un account Admin' }, 403)
+    // Solo un Admin può eliminare un altro Admin (BO e HR non possono)
+    if ((caller.ruolo === 'bo' || caller.ruolo === 'hr') && target.ruolo === 'admin') {
+      return json({ error: 'Solo un Admin può eliminare un account Admin' }, 403)
     }
 
     // Eliminazione effettiva (auth.users → CASCADE su public.utenti)

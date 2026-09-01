@@ -19,19 +19,21 @@ import { useAuth } from '@/contexts/AuthContext'
 // Scelte di scope (§11):
 //  - PdV NON vede "Punti Vendita" né "Collaboratori": gestisce solo i contratti
 //    del proprio negozio dalle pagine principali.
+// HR (Responsabile HR — dal 2026-07): sola visualizzazione simile al DV;
+// NON vede Gara Gallery, Simulatore, Prodotti; PUÒ gestire account (Admin).
 const items = [
   { to: '/',             label: 'Home',          icon: Home },
   { to: '/contratti',    label: 'Contratti',     icon: FileText },
   { to: '/clienti',      label: 'Clienti',       icon: Users },
-  { to: '/pdv',          label: 'Punti Vendita', icon: Store,    roles: ['admin','bo','dv','as','tm'] },
-  { to: '/collaboratori',label: 'Collaboratori', icon: UserCog,  roles: ['admin','bo','dv','as','tm'] },
+  { to: '/pdv',          label: 'Punti Vendita', icon: Store,    roles: ['admin','bo','dv','as','tm','hr'] },
+  { to: '/collaboratori',label: 'Collaboratori', icon: UserCog,  roles: ['admin','bo','dv','as','tm','hr'] },
   { to: '/classifiche',  label: 'Classifiche',   icon: BarChart3 },
   { to: '/target',       label: 'Target',        icon: Target },
-  { to: '/gara-gallery', label: 'Gara Gallery',  icon: Trophy,   roles: ['admin'] }, // solo admin (§11)
-  { to: '/simulatore',   label: 'Simulatore',    icon: Calculator, roles: ['admin'] }, // solo admin
-  { to: '/prodotti',     label: 'Prodotti',      icon: Package,  roles: ['admin','bo'] },
+  { to: '/gara-gallery', label: 'Gara Gallery',  icon: Trophy,   roles: ['admin'] }, // solo admin (§11) — HR NON vede
+  { to: '/simulatore',   label: 'Simulatore',    icon: Calculator, roles: ['admin'] }, // solo admin — HR NON vede
+  { to: '/prodotti',     label: 'Prodotti',      icon: Package,  roles: ['admin','bo'] }, // HR NON vede (non deve poterli modificare)
   { to: '/organigramma', label: 'Organigramma',  icon: Network },
-  { to: '/admin',        label: 'Admin',         icon: Settings, roles: ['admin','bo'] },
+  { to: '/admin',        label: 'Admin',         icon: Settings, roles: ['admin','bo','hr'] },
 ]
 
 export default function Sidebar({ mobileOpen = false, onClose }) {

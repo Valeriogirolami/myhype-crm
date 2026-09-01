@@ -40,7 +40,7 @@ function json(body: unknown, status = 200) {
   })
 }
 
-const RUOLI_VALIDI = ['admin', 'bo', 'dv', 'as', 'tm', 'pdv']
+const RUOLI_VALIDI = ['admin', 'bo', 'dv', 'as', 'tm', 'pdv', 'hr']
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -127,16 +127,17 @@ Deno.serve(async (req: Request) => {
     const caller = callerRows?.[0]
     if (!caller) return json({ error: 'Profilo chiamante non trovato' }, 403)
     if (!caller.attivo) return json({ error: 'Account chiamante non attivo' }, 403)
-    if (!['admin', 'bo'].includes(caller.ruolo)) {
-      return json({ error: 'Solo Admin o Back Office possono creare account' }, 403)
+    // Admin, BO e HR possono creare account (HR aggiunto 2026-07)
+    if (!['admin', 'bo', 'hr'].includes(caller.ruolo)) {
+      return json({ error: 'Solo Admin, Back Office o HR possono creare account' }, 403)
     }
 
     // 4) Parsing input
     const inputBody = await req.json()
 
-    // Sicurezza: BO non può creare account ADMIN
-    if (caller.ruolo === 'bo' && inputBody?.ruolo === 'admin') {
-      return json({ error: 'Il Back Office non può creare account Admin.' }, 403)
+    // Sicurezza: solo Admin può creare altri Admin (BO e HR non possono)
+    if ((caller.ruolo === 'bo' || caller.ruolo === 'hr') && inputBody?.ruolo === 'admin') {
+      return json({ error: 'Solo un Admin può creare account Admin.' }, 403)
     }
     // Inoltro a step 5 senza rifare la req.json()
     const body = inputBody

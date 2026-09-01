@@ -41,8 +41,9 @@ export default function App() {
             <Route path="*"            element={<Placeholder title="404"           description="Pagina non trovata." step="—" />} />
           </Route>
 
-          {/* Area PdV / Collaboratori — non accessibile al ruolo 'pdv' (§11) */}
-          <Route element={<ProtectedRoute roles={['admin','bo','dv','as','tm']} />}>
+          {/* Area PdV / Collaboratori — non accessibile al ruolo 'pdv' (§11).
+              HR (2026-07) può vedere le anagrafiche ma non modificarle. */}
+          <Route element={<ProtectedRoute roles={['admin','bo','dv','as','tm','hr']} />}>
             <Route element={<Layout />}>
               <Route path="pdv"           element={<Pdv />} />
               <Route path="collaboratori" element={<Collaboratori />} />
@@ -64,8 +65,8 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Area Admin — accessibile solo a ruoli admin/bo (§11) */}
-          <Route element={<ProtectedRoute roles={['admin','bo']} />}>
+          {/* Area Admin — accessibile a Admin/BO/HR (HR aggiunto 2026-07 per gestione account) */}
+          <Route element={<ProtectedRoute roles={['admin','bo','hr']} />}>
             <Route element={<Layout />}>
               <Route path="admin" element={<Admin />} />
             </Route>

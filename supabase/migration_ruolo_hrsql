@@ -1,0 +1,15 @@
+-- ============================================================================
+-- MyHype — Migrazione: nuovo ruolo 'hr' (Responsabile HR)
+-- ============================================================================
+-- Richiesta Valerio (2026-07):
+--   Ruolo di sola visualizzazione simile a Direttore Vendite ma senza vedere
+--   fatturati/soldi, senza Gara Gallery, senza Simulatore, senza modifica
+--   di prodotti/target/clienti/contratti. Può però gestire in totale
+--   autonomia gli account (tranne Admin).
+--
+-- NOTA IMPORTANTE:
+--   ALTER TYPE ... ADD VALUE non può stare dentro una transazione con altri
+--   comandi. ESEGUIRE QUESTA RIGA DA SOLA (poi ricaricare l'app).
+-- ============================================================================
+
+ALTER TYPE ruolo_utente ADD VALUE IF NOT EXISTS 'hr';

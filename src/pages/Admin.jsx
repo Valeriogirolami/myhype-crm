@@ -21,6 +21,7 @@ import UtenteDialog from './UtenteDialog'
 const labelRuolo = {
   admin: 'Admin',
   bo:    'Back Office',
+  hr:    'Responsabile HR',
   dv:    'Direttore Vendite',
   as:    'Area Sales',
   tm:    'Team Manager',
@@ -30,6 +31,7 @@ const labelRuolo = {
 const toneRuolo = {
   admin: 'danger',
   bo:    'accent',
+  hr:    'info',
   dv:    'warning',
   as:    'info',
   tm:    'accent',
@@ -126,7 +128,8 @@ export default function Admin() {
         <FilterPill icon={Filter} label="Ruolo" value={filterRuolo} onChange={setRuolo}
           options={[
             ['tutti','Tutti'],
-            ['admin','Admin'], ['bo','Back Office'], ['dv','Direttore Vendite'],
+            ['admin','Admin'], ['bo','Back Office'], ['hr','Responsabile HR'],
+            ['dv','Direttore Vendite'],
             ['as','Area Sales'], ['tm','Team Manager'], ['pdv','Punto Vendita'],
           ]}
         />

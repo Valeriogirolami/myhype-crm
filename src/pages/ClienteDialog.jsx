@@ -30,6 +30,8 @@ import { validaCampiCliente, confermaInserimentoForzato } from '@/lib/validators
 export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
   const { profile } = useAuth()
   const isBoAdmin = ['admin', 'bo'].includes(profile?.ruolo)
+  // HR: sola visualizzazione senza fatturati (2026-07)
+  const isHr = profile?.ruolo === 'hr'
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -216,7 +218,7 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
       ) : editing ? (
         <FormCliente form={form} setF={setF} />
       ) : (
-        <ViewCliente data={data} contratti={contratti} stats={stats} />
+        <ViewCliente data={data} contratti={contratti} stats={stats} isHr={isHr} />
       )}
     </Dialog>
   )
@@ -224,7 +226,7 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
 
 // ---------- View ----------
 
-function ViewCliente({ data, contratti, stats }) {
+function ViewCliente({ data, contratti, stats, isHr = false }) {
   // Tendina espandi/comprimi per vedere i sottoprodotti di ciascun contratto
   const [aperti, setAperti] = useState(() => new Set())
   function toggleAperto(id) {
@@ -257,13 +259,16 @@ function ViewCliente({ data, contratti, stats }) {
         </div>
       </div>
 
-      {/* Stats compatte */}
+      {/* Stats compatte — HR non vede Fatt. PdV (2026-07) */}
       {stats.totale > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className={cn(
+          'grid gap-3',
+          isHr ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4',
+        )}>
           <Mini label="Validati" value={formatInt(stats.validati)} />
           <Mini label="Gettonati" value={formatInt(stats.gettonati)} />
           <Mini label="Punti tot." value={formatInt(stats.punti)} />
-          <Mini label="Fatt. PdV" value={formatEuro(stats.fatturatoPdv)} />
+          {!isHr && <Mini label="Fatt. PdV" value={formatEuro(stats.fatturatoPdv)} />}
         </div>
       )}
 
@@ -373,7 +378,8 @@ function ViewCliente({ data, contratti, stats }) {
                                 >
                                   <span className="text-sm text-white">{sp.nome}</span>
                                   <span className="text-xs tabular-nums text-text-muted">
-                                    {formatInt(sp.punti)} pt · {formatEuro(sp.fatturato_pdv)}
+                                    {formatInt(sp.punti)} pt
+                                    {!isHr && ` · ${formatEuro(sp.fatturato_pdv)}`}
                                   </span>
                                 </li>
                               ))}

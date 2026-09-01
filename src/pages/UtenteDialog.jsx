@@ -27,6 +27,7 @@ import { createUser, updateUserPassword, deleteUser } from '@/lib/edgeFunctions'
 const RUOLI = [
   { v: 'admin', l: 'Admin' },
   { v: 'bo',    l: 'Back Office' },
+  { v: 'hr',    l: 'Responsabile HR' },
   { v: 'dv',    l: 'Direttore Vendite' },
   { v: 'as',    l: 'Area Sales' },
   { v: 'tm',    l: 'Team Manager' },
@@ -36,10 +37,12 @@ const RUOLI = [
 /**
  * Quali ruoli può ASSEGNARE / GESTIRE chi sta facendo l'operazione.
  * Solo Admin può creare/promuovere altri Admin (regola §11).
+ * HR (dal 2026-07) può gestire tutti i ruoli tranne Admin (come BO).
  */
 const RUOLI_GESTIBILI = {
-  admin: ['admin', 'bo', 'dv', 'as', 'tm', 'pdv'],
-  bo:    ['bo', 'dv', 'as', 'tm', 'pdv'],   // BO NON può creare Admin
+  admin: ['admin', 'bo', 'hr', 'dv', 'as', 'tm', 'pdv'],
+  bo:    ['bo', 'hr', 'dv', 'as', 'tm', 'pdv'],   // BO NON può creare Admin
+  hr:    ['bo', 'hr', 'dv', 'as', 'tm', 'pdv'],   // HR NON può creare Admin
 }
 
 // Schema CREA — include password e (opzionale) pdv_id
@@ -48,7 +51,7 @@ const schemaCrea = z.object({
   cognome:  z.string().min(1, 'Obbligatorio').max(80),
   email:    z.string().min(1, 'Obbligatorio').email('Email non valida'),
   password: z.string().min(8, 'Minimo 8 caratteri'),
-  ruolo:    z.enum(['admin','bo','dv','as','tm','pdv']),
+  ruolo:    z.enum(['admin','bo','hr','dv','as','tm','pdv']),
   pdv_id:   z.string().optional().or(z.literal('')),
 }).refine(d => d.ruolo !== 'pdv' || !!d.pdv_id, {
   message: 'Per ruolo "Punto Vendita" devi selezionare il PdV',
@@ -59,7 +62,7 @@ const schemaCrea = z.object({
 const schemaModifica = z.object({
   nome:    z.string().min(1, 'Obbligatorio').max(80),
   cognome: z.string().min(1, 'Obbligatorio').max(80),
-  ruolo:   z.enum(['admin','bo','dv','as','tm','pdv']),
+  ruolo:   z.enum(['admin','bo','hr','dv','as','tm','pdv']),
   attivo:  z.boolean(),
 })
 
