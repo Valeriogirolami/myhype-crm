@@ -117,7 +117,9 @@ export function classificaVenditori(contratti, limit = 10, criterio = 'punti') {
 }
 
 /**
- * Aggrega TUTTI i PdV con la loro produzione del mese, scomposta per prodotto.
+ * Aggrega TUTTI i PdV con la loro produzione del mese in PUNTI, scomposta per
+ * prodotto (§10.1, upd 2026-07: prima erano numeri contratti, ora sono i punti
+ * totali - metrica commercialmente più rilevante).
  * Carica anche i PdV senza contratti (per l'istogramma di overview).
  */
 export async function fetchProduzioneTuttiPdv(contratti) {
@@ -129,7 +131,7 @@ export async function fetchProduzioneTuttiPdv(contratti) {
     .order('nome')
   if (error) throw error
 
-  // 2) Mappa contratti per pdv_id
+  // 2) Mappa PUNTI per pdv_id e prodotto
   const map = new Map()
   for (const p of pdvAperti || []) {
     map.set(p.id, {
@@ -146,12 +148,14 @@ export async function fetchProduzioneTuttiPdv(contratti) {
   for (const c of contratti) {
     const cur = map.get(c.pdv?.id)
     if (!cur) continue
-    if (c.prodotto === 'mobile')  cur.mobile += 1
-    if (c.prodotto === 'fisso')   cur.fisso += 1
-    if (c.prodotto === 'energia') cur.energia += 1
-    cur.totale += 1
+    const pt = totaleContratto(c).punti
+    if (c.prodotto === 'mobile')  cur.mobile  += pt
+    if (c.prodotto === 'fisso')   cur.fisso   += pt
+    if (c.prodotto === 'energia') cur.energia += pt
+    cur.totale += pt
   }
-  // Ordino per totale desc per leggibilità grafico
+  // Ordino per totale desc (punti totali per PdV) — così l'istogramma
+  // mostra a sinistra i PdV con più punti
   return Array.from(map.values()).sort((a, b) => b.totale - a.totale)
 }
 

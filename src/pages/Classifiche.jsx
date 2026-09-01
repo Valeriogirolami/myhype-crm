@@ -149,7 +149,7 @@ export default function Classifiche() {
               <div className="flex items-center gap-2">
                 <BarChart3 size={16} className="text-accent-2" />
                 <h3 className="text-sm font-medium uppercase tracking-wider text-white">
-                  Produzione di tutti i PdV
+                  Produzione di tutti i PdV (punti)
                 </h3>
                 <span className="text-xs text-text-muted">
                   · {produzionePdv.length} {produzionePdv.length === 1 ? 'PdV' : 'PdV'} aperti
@@ -204,10 +204,10 @@ export default function Classifiche() {
                     <Tooltip
                       contentStyle={tooltipStyle}
                       cursor={{ fill: '#FFFFFF08' }}
-                      formatter={(value, name) => [formatInt(value), name]}
+                      formatter={(value, name) => [`${formatInt(value)} pt`, name]}
                       labelFormatter={(label, items) => {
                         const tot = (items || []).reduce((s, it) => s + (it.value || 0), 0)
-                        return `${label} · totale ${formatInt(tot)}`
+                        return `${label} · totale ${formatInt(tot)} pt`
                       }}
                     />
                     <Bar dataKey="mobile"  name="Mobile"  stackId="a" fill="#2B6CFF" />
