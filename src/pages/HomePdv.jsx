@@ -140,11 +140,23 @@ export default function HomePdv() {
   const giornoOggi = giorniConsumati(meseSel)
   const giorniTot = giorniTotaliMese(meseSel)
 
+  // NB: loading/errore vengono resi INTERNAMENTE al return principale (non con
+  // early return), altrimenti il ContrattoNuovoDialog verrebbe smontato durante
+  // il ricaricamento e perderebbe la sua success view "Nuovo contratto stesso
+  // cliente". Bug risolto §2026-07.
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-16 text-text-muted">
-        <Loader2 size={18} className="animate-spin" /> Caricamento dashboard…
-      </div>
+      <>
+        <div className="flex items-center justify-center gap-2 py-16 text-text-muted">
+          <Loader2 size={18} className="animate-spin" /> Caricamento dashboard…
+        </div>
+        {/* Il dialog deve restare montato anche durante i reload interni */}
+        <ContrattoNuovoDialog
+          open={nuovoOpen}
+          onClose={() => setNuovoOpen(false)}
+          onCreated={fetchAll}
+        />
+      </>
     )
   }
 
