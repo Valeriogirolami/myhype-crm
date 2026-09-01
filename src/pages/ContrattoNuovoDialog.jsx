@@ -19,7 +19,7 @@
  *   - Chiudi
  *   - "+ Nuovo contratto stesso cliente" (riusa il cliente appena creato/scelto)
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, ChevronLeft, ChevronRight, Loader2, Plus, Search, Trash2, User, Users, Package, FileText, X } from 'lucide-react'
 import Dialog from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
@@ -543,6 +543,16 @@ export default function ContrattoNuovoDialog({ open, onClose, onCreated }) {
 function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUseEsistente, onScollega }) {
   const set = (k, v) => setCliente(prev => ({ ...prev, [k]: v }))
 
+  // Scroll automatico all'alert CF duplicato quando appare (2026-07).
+  // Serve perché l'utente potrebbe aver scrollato più in basso per compilare
+  // il resto del form: senza questo, l'alert in cima resterebbe nascosto.
+  const alertRef = useRef(null)
+  useEffect(() => {
+    if (duplicati.length > 0 && !clienteEsistenteId && alertRef.current) {
+      alertRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [duplicati.length, clienteEsistenteId])
+
   return (
     <div className="space-y-4">
       {clienteEsistenteId && (
@@ -554,6 +564,38 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
           <Button variant="ghost" size="sm" onClick={onScollega}>
             <X size={12} /> Cambia
           </Button>
+        </div>
+      )}
+
+      {/* Alert CF duplicato — spostato in cima al form (2026-07) così è
+          immediatamente visibile e non resta nascosto sotto lo scroll.
+          scrollIntoView lo porta al centro del viewport quando appare. */}
+      {!clienteEsistenteId && duplicati.length > 0 && (
+        <div
+          ref={alertRef}
+          className="rounded-xl border border-danger/60 bg-danger/15 p-3 shadow-lg ring-1 ring-danger/20"
+        >
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-danger">
+            <Search size={14} />
+            Questo CF è già presente: devi usare uno dei clienti esistenti.
+          </div>
+          <ul className="space-y-1.5">
+            {duplicati.map(c => (
+              <li key={c.id} className="flex items-center justify-between rounded-lg border border-border bg-bg px-3 py-2 text-sm">
+                <div>
+                  <div className="text-white">{nomeCliente(c)}</div>
+                  <div className="text-xs text-text-muted">{c.email} · {c.telefono}</div>
+                </div>
+                <Button size="sm" onClick={() => onUseEsistente(c)}>
+                  Usa questo
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-text-muted">
+            Per evitare doppioni nell'anagrafica, ogni cliente esiste una sola volta per Codice Fiscale.
+            Se hai sbagliato CF, correggilo qui sotto.
+          </p>
         </div>
       )}
 
@@ -625,32 +667,6 @@ function StepCliente({ cliente, setCliente, duplicati, clienteEsistenteId, onUse
             <Input label="POD (solo Energia)" hint="Opzionale" value={cliente.pod} onChange={e => set('pod', e.target.value)} disabled={!!clienteEsistenteId} />
             <Input label="PDR (solo Gas)"      hint="Opzionale" value={cliente.pdr} onChange={e => set('pdr', e.target.value)} disabled={!!clienteEsistenteId} />
           </div>
-
-          {!clienteEsistenteId && duplicati.length > 0 && (
-            <div className="rounded-xl border border-danger/50 bg-danger/10 p-3">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-danger">
-                <Search size={14} />
-                Questo CF è già presente: devi usare uno dei clienti esistenti.
-              </div>
-              <ul className="space-y-1.5">
-                {duplicati.map(c => (
-                  <li key={c.id} className="flex items-center justify-between rounded-lg border border-border bg-bg px-3 py-2 text-sm">
-                    <div>
-                      <div className="text-white">{nomeCliente(c)}</div>
-                      <div className="text-xs text-text-muted">{c.email} · {c.telefono}</div>
-                    </div>
-                    <Button size="sm" onClick={() => onUseEsistente(c)}>
-                      Usa questo
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-xs text-text-muted">
-                Per evitare doppioni nell'anagrafica, ogni cliente esiste una sola volta per Codice Fiscale.
-                Se hai sbagliato CF, correggilo qui sopra.
-              </p>
-            </div>
-          )}
         </>
       )}
     </div>
