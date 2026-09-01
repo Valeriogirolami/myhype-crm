@@ -312,7 +312,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
       const { error } = await supabase.from('contratti').update(updates).eq('id', data.id)
       if (error) throw error
 
-      // Notifica al PdV + TM se il contratto è andato in KO (§13)
+      // Notifica al PdV + TM + AS se il contratto è andato in KO (§13, upd 2026-07)
       if (quickAction === 'ko' || quickAction === 'ko_nv') {
         const clienteNome = data.cliente?.categoria === 'azienda'
           ? data.cliente?.ragione_sociale
@@ -565,7 +565,7 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
         if (errIns) throw errIns
       }
 
-      // Notifica al PdV + TM se il nuovo stato è KO o KO non validato (§13)
+      // Notifica al PdV + TM + AS se il nuovo stato è KO o KO non validato (§13, upd 2026-07)
       if ((nuovoStato === 'ko' || nuovoStato === 'ko_non_validato') &&
           data.stato !== nuovoStato) {
         const clienteNome = data.cliente?.categoria === 'azienda'

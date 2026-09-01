@@ -81,8 +81,13 @@ export async function marcaTutteLette(userId) {
 // --------------------------------------------------------------------------
 
 /**
- * Notifica ai destinatari (PdV proprietario + TM del PdV) per KO contratto.
+ * Notifica ai destinatari (PdV proprietario + TM + AS del PdV) per KO contratto.
  * Da chiamare DOPO un cambio stato a 'ko' o 'ko_non_validato'.
+ *
+ * Destinatari (§2026-07):
+ *  - Account PdV proprietario (pdv.account_id)
+ *  - Tutti i TM assegnati al PdV (pdv_collaboratori.ruolo_nel_pdv='tm')
+ *  - Tutti gli AS assegnati al PdV (pdv_collaboratori.ruolo_nel_pdv='as')
  */
 export async function notificaKoContratto({ contrattoId, pdvId, tipoKo, motivo, clienteNome }) {
   try {
@@ -90,17 +95,18 @@ export async function notificaKoContratto({ contrattoId, pdvId, tipoKo, motivo, 
     const { data: pdv } = await supabase
       .from('pdv').select('id, nome, account_id').eq('id', pdvId).maybeSingle()
 
-    // Trovo i TM del PdV (collaboratori con ruolo_nel_pdv='tm' che hanno account_id)
-    const { data: tmAssoc } = await supabase
+    // Trovo i TM E gli AS del PdV in una singola query
+    // (collaboratori con ruolo_nel_pdv in tm/as che hanno account_id)
+    const { data: managerAssoc } = await supabase
       .from('pdv_collaboratori')
-      .select('collaboratori(account_id)')
+      .select('ruolo_nel_pdv, collaboratori(account_id)')
       .eq('pdv_id', pdvId)
-      .eq('ruolo_nel_pdv', 'tm')
+      .in('ruolo_nel_pdv', ['tm', 'as'])
 
     const destinatari = new Set()
     if (pdv?.account_id) destinatari.add(pdv.account_id)
-    for (const t of tmAssoc || []) {
-      if (t.collaboratori?.account_id) destinatari.add(t.collaboratori.account_id)
+    for (const m of managerAssoc || []) {
+      if (m.collaboratori?.account_id) destinatari.add(m.collaboratori.account_id)
     }
 
     const titolo = tipoKo === 'ko_non_validato'
