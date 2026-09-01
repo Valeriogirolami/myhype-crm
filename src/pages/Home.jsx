@@ -68,7 +68,7 @@ function HomeAdmin() {
   const [contratti, setContratti] = useState([])
   const [targetRete, setTargetRete] = useState({ mobile: 0, fisso: 0, energia: 0 })
   const [contrattiPrev, setContrattiPrev] = useState([])
-  // Scope: null = tutti (admin/bo/dv) | array IDs (as/tm)
+  // Scope: null = tutti (admin/bo/dv/hr) | array IDs (as/tm)
   const [scopeIds, setScopeIds] = useState(null)
   const [scopeReady, setScopeReady] = useState(false)
 

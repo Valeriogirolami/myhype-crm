@@ -164,7 +164,8 @@ export async function fetchProduzioneTuttiPdv(contratti) {
 export async function getPdvScopeIds(profile) {
   if (!profile) return []
   const ruolo = profile.ruolo
-  if (['admin', 'bo', 'dv'].includes(ruolo)) return null  // null = tutti
+  // Scope globale: Admin, BO, DV, HR (HR aggiunto 2026-07)
+  if (['admin', 'bo', 'dv', 'hr'].includes(ruolo)) return null  // null = tutti
   if (ruolo === 'pdv') {
     const { data } = await supabase
       .from('pdv')
