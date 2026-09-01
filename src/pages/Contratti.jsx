@@ -69,6 +69,7 @@ export default function Contratti() {
   const [filterPdv, setPdv] = useState('tutti')
   const [filterArea, setArea] = useState('tutte')
   const [filterProdotto, setProdotto] = useState('tutti')
+  const [filterVenditore, setVenditore] = useState('tutti')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   // Filtro mese gettonamento (YYYY-MM)
@@ -170,6 +171,23 @@ export default function Contratti() {
     return Array.from(set).sort().reverse() // più recenti prima
   }, [rows])
 
+  // Lista venditori presenti nei contratti dello scope corrente (per il filtro
+  // Venditore). Derivata dai rows così vede automaticamente lo scope RLS/app,
+  // senza fetch aggiuntivi. Ordinata alfabeticamente per cognome+nome.
+  const venditoriDisp = useMemo(() => {
+    const map = new Map()
+    for (const r of rows) {
+      const v = r.venditore
+      if (!v || !v.id) continue
+      if (!map.has(v.id)) {
+        map.set(v.id, { id: v.id, label: `${v.nome} ${v.cognome}`.trim() })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.label.toLowerCase().localeCompare(b.label.toLowerCase())
+    )
+  }, [rows])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return rows.filter(r => {
@@ -177,6 +195,14 @@ export default function Contratti() {
       if (filterProdotto  !== 'tutti' && r.prodotto !== filterProdotto) return false
       if (filterPdv       !== 'tutti' && r.pdv?.id !== filterPdv) return false
       if (filterArea      !== 'tutte' && r.pdv?.area !== Number(filterArea)) return false
+      // Filtro venditore: 'nessuno' → contratti senza venditore assegnato
+      if (filterVenditore !== 'tutti') {
+        if (filterVenditore === 'nessuno') {
+          if (r.venditore?.id) return false
+        } else if (r.venditore?.id !== filterVenditore) {
+          return false
+        }
+      }
       if (filterMeseGettona !== 'tutti') {
         if (filterMeseGettona === 'nessuno') {
           if (r.mese_gettonamento) return false
@@ -198,7 +224,7 @@ export default function Contratti() {
       return true
     })
   }, [rows, search, filterStato, filterPdv, filterArea, filterProdotto,
-      dateFrom, dateTo, filterMeseGettona])
+      filterVenditore, dateFrom, dateTo, filterMeseGettona])
 
   // --- Paginazione client-side ---
   const totalePagine = pageSize === 'tutti'
@@ -208,7 +234,7 @@ export default function Contratti() {
   // Se cambiano i filtri o la dimensione pagina, torno alla pagina 1
   useEffect(() => { setPage(1) }, [
     search, filterStato, filterPdv, filterArea, filterProdotto,
-    dateFrom, dateTo, filterMeseGettona, pageSize,
+    filterVenditore, dateFrom, dateTo, filterMeseGettona, pageSize,
   ])
 
   // Se la pagina corrente eccede il totale (es. dopo un filtro), la riallineo
@@ -507,6 +533,16 @@ export default function Contratti() {
               />
             </>
           )}
+          {/* Filtro Venditore — visibile a tutti i ruoli (2026-07).
+              La lista è derivata dai contratti nello scope corrente:
+              vengono mostrati solo i venditori che hanno almeno un contratto. */}
+          <FilterPill label="Venditore" value={filterVenditore} onChange={setVenditore}
+            options={[
+              ['tutti','Tutti'],
+              ['nessuno','Senza venditore'],
+              ...venditoriDisp.map(v => [v.id, v.label]),
+            ]}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-sm">
