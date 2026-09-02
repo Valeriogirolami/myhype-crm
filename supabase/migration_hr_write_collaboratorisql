@@ -1,0 +1,26 @@
+-- ============================================================================
+-- MyHype — Migrazione: HR può scrivere su 'collaboratori' (rinnovo contratti)
+-- ============================================================================
+-- Contesto (2026-07): il Responsabile HR gestisce i contratti di lavoro dei
+-- collaboratori, quindi deve poter:
+--   - modificare data_scadenza_contratto (bottone 'Rinnova' in Contratti in scadenza)
+--   - aggiornare gli altri dati anagrafici del collaboratore all'occorrenza
+--
+-- La policy esistente 'collab_write_admin_bo' consentiva la scrittura solo
+-- ad Admin e BO. La ridefiniamo aggiungendo HR.
+--
+-- La lettura (collab_read_authenticated) resta invariata: tutti gli utenti
+-- loggati possono leggere.
+-- ============================================================================
+
+BEGIN;
+
+-- Sostituisco la policy esistente con una che include HR
+DROP POLICY IF EXISTS "collab_write_admin_bo" ON public.collaboratori;
+
+CREATE POLICY "collab_write_admin_bo_hr"
+  ON public.collaboratori FOR ALL
+  USING     (public.current_user_role() IN ('admin','bo','hr'))
+  WITH CHECK (public.current_user_role() IN ('admin','bo','hr'));
+
+COMMIT;

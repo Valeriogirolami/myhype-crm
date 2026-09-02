@@ -141,7 +141,9 @@ export function classificaScadenza(dataStr) {
 // -----------------------------------------------------------------------------
 export default function ContrattiScadenza() {
   const { profile } = useAuth()
-  const canEdit = ['admin', 'bo'].includes(profile?.ruolo)
+  // HR aggiunto 2026-07: responsabile risorse umane, deve poter rinnovare i
+  // contratti di lavoro dei collaboratori.
+  const canEdit = ['admin', 'bo', 'hr'].includes(profile?.ruolo)
 
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState([])
