@@ -179,18 +179,47 @@ export default function UtenteDialog({
           ruolo:    values.ruolo,
           pdv_id:   values.ruolo === 'pdv' ? values.pdv_id : undefined,
         })
-        // Se è una creazione "linkata" a un Collaboratore esistente, lo aggancio
+        // Se è una creazione "linkata" a un Collaboratore esistente, lo aggancio.
+        // Altrimenti (creazione libera da Admin) cerco automaticamente un
+        // collaboratore con la stessa email SENZA account: se lo trovo, lo
+        // aggancio comunque. Evita il caso "creato lo stesso Yuri due volte
+        // ma non collegati" (§2026-07).
         const newUserId = result?.user?.id
-        if (linkCollaboratore?.id && newUserId) {
-          const { error: errLink } = await supabase
-            .from('collaboratori')
-            .update({ account_id: newUserId })
-            .eq('id', linkCollaboratore.id)
-          if (errLink) {
-            toast.warning(`Utente creato ma associazione al collaboratore fallita: ${errLink.message}`)
+        let collabAgganciato = null
+        if (newUserId) {
+          if (linkCollaboratore?.id) {
+            const { error: errLink } = await supabase
+              .from('collaboratori')
+              .update({ account_id: newUserId })
+              .eq('id', linkCollaboratore.id)
+            if (errLink) {
+              toast.warning(`Utente creato ma associazione al collaboratore fallita: ${errLink.message}`)
+            } else {
+              collabAgganciato = `${linkCollaboratore.nome} ${linkCollaboratore.cognome}`
+            }
           } else {
-            toast.success(`Utente creato e associato a ${linkCollaboratore.nome} ${linkCollaboratore.cognome}.`)
+            // Auto-match per email (case-insensitive), solo se il collaboratore
+            // non ha già un account e ha esattamente 1 corrispondenza
+            const { data: candidati } = await supabase
+              .from('collaboratori')
+              .select('id, nome, cognome')
+              .ilike('email', values.email.trim())
+              .is('account_id', null)
+              .eq('stato', 'attivo')
+            if (candidati && candidati.length === 1) {
+              const c = candidati[0]
+              const { error: errAuto } = await supabase
+                .from('collaboratori')
+                .update({ account_id: newUserId })
+                .eq('id', c.id)
+              if (!errAuto) {
+                collabAgganciato = `${c.nome} ${c.cognome}`
+              }
+            }
           }
+        }
+        if (collabAgganciato) {
+          toast.success(`Utente creato e associato al collaboratore ${collabAgganciato}.`)
         } else {
           toast.success('Utente creato.')
         }
