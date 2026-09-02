@@ -113,6 +113,7 @@ export default function PdvDialog({ open, onClose, pdv, onSaved }) {
     <Dialog
       open={open}
       onClose={onClose}
+      dismissOnBackdrop={false}
       size="lg"
       title={isEdit ? 'Modifica Punto Vendita' : 'Nuovo Punto Vendita'}
       description={

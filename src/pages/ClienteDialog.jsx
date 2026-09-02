@@ -184,6 +184,7 @@ export default function ClienteDialog({ open, onClose, clienteId, onSaved }) {
     <Dialog
       open={open}
       onClose={onClose}
+      dismissOnBackdrop={false}
       size="lg"
       title={data ? `Cliente · ${nomeCliente(data)}` : 'Cliente'}
       description={data?.codice_fiscale ? `CF: ${data.codice_fiscale}` : ''}

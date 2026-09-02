@@ -179,6 +179,7 @@ export default function CollaboratoreDialog({ open, onClose, collaboratore, onSa
     <Dialog
       open={open}
       onClose={onClose}
+      dismissOnBackdrop={false}
       size="lg"
       title={isEdit ? 'Modifica collaboratore' : 'Nuovo collaboratore'}
       description={

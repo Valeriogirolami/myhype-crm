@@ -255,6 +255,7 @@ export default function UtenteDialog({
     <Dialog
       open={open}
       onClose={onClose}
+      dismissOnBackdrop={false}
       size="md"
       title={
         isEdit ? 'Modifica utente' :
