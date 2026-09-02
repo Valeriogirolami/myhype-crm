@@ -1,0 +1,28 @@
+-- ============================================================================
+-- MyHype — Migrazione: HR può scrivere su 'pdv' e 'pdv_collaboratori'
+-- ============================================================================
+-- Contesto (2026-07 seguito della migrazione HR):
+--   Il Responsabile HR deve poter creare/modificare Punti Vendita e le
+--   associazioni collaboratore-PdV, come già può fare con la tabella
+--   collaboratori (vedi migration_hr_write_collaboratori.sql).
+-- ============================================================================
+
+BEGIN;
+
+-- Tabella PDV --------------------------------------------------------------
+DROP POLICY IF EXISTS "pdv_write_admin_bo" ON public.pdv;
+
+CREATE POLICY "pdv_write_admin_bo_hr"
+  ON public.pdv FOR ALL
+  USING     (public.current_user_role() IN ('admin','bo','hr'))
+  WITH CHECK (public.current_user_role() IN ('admin','bo','hr'));
+
+-- Tabella PDV_COLLABORATORI (associazioni) --------------------------------
+DROP POLICY IF EXISTS "pdv_coll_write_admin_bo" ON public.pdv_collaboratori;
+
+CREATE POLICY "pdv_coll_write_admin_bo_hr"
+  ON public.pdv_collaboratori FOR ALL
+  USING     (public.current_user_role() IN ('admin','bo','hr'))
+  WITH CHECK (public.current_user_role() IN ('admin','bo','hr'));
+
+COMMIT;

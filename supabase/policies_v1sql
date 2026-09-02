@@ -60,10 +60,11 @@ create policy "pdv_read_authenticated"
   on public.pdv for select
   using (auth.uid() is not null);
 
-create policy "pdv_write_admin_bo"
+-- HR aggiunto 2026-07: gestione anagrafica PdV
+create policy "pdv_write_admin_bo_hr"
   on public.pdv for all
-  using (public.current_user_role() in ('admin','bo'))
-  with check (public.current_user_role() in ('admin','bo'));
+  using (public.current_user_role() in ('admin','bo','hr'))
+  with check (public.current_user_role() in ('admin','bo','hr'));
 
 -- ============================================================================
 -- TABELLA: collaboratori
@@ -87,10 +88,11 @@ create policy "pdv_coll_read_authenticated"
   on public.pdv_collaboratori for select
   using (auth.uid() is not null);
 
-create policy "pdv_coll_write_admin_bo"
+-- HR aggiunto 2026-07: assegnazioni collaboratore-PdV
+create policy "pdv_coll_write_admin_bo_hr"
   on public.pdv_collaboratori for all
-  using (public.current_user_role() in ('admin','bo'))
-  with check (public.current_user_role() in ('admin','bo'));
+  using (public.current_user_role() in ('admin','bo','hr'))
+  with check (public.current_user_role() in ('admin','bo','hr'));
 
 -- ============================================================================
 -- TABELLA: clienti

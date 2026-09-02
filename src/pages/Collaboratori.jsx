@@ -50,7 +50,8 @@ function puoAvereAccount(ruolo) {
 
 export default function Collaboratori() {
   const { profile } = useAuth()
-  const canEdit = ['admin', 'bo'].includes(profile?.ruolo)
+  // HR aggiunto 2026-07: crea e gestisce collaboratori (contratti di lavoro)
+  const canEdit = ['admin', 'bo', 'hr'].includes(profile?.ruolo)
   const isAsTm = ['as', 'tm'].includes(profile?.ruolo)
 
   const [rows, setRows] = useState([])

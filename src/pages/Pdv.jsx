@@ -24,7 +24,8 @@ const toneStato       = { aperto: 'success', chiuso: 'neutral' }
 
 export default function Pdv() {
   const { profile } = useAuth()
-  const canEdit = ['admin', 'bo'].includes(profile?.ruolo)
+  // HR aggiunto 2026-07: gestisce anche l'anagrafica dei Punti Vendita
+  const canEdit = ['admin', 'bo', 'hr'].includes(profile?.ruolo)
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
