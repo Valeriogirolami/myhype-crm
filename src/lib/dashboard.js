@@ -82,7 +82,8 @@ export async function fetchContrattiMese(ym, pdvIds = null) {
       mese_gettonamento, mese_storno,
       fatturato_pdv_snap, fatturato_azienda_snap, punti_snap,
       pdv:pdv(id, nome, tipo, area, categoria),
-      contratto_sottoprodotti(sottoprodotti(punti, fatturato_pdv, fatturato_azienda))
+      venditore:collaboratori(id, nome, cognome, ruolo, account_id),
+      contratto_sottoprodotti(sottoprodotti(nome, punti, fatturato_pdv, fatturato_azienda))
     `)
     .gte('data_stipula', start)
     .lte('data_stipula', end)
