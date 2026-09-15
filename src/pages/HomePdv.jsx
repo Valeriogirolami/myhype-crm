@@ -140,36 +140,35 @@ export default function HomePdv() {
   const giornoOggi = giorniConsumati(meseSel)
   const giorniTot = giorniTotaliMese(meseSel)
 
-  // NB: loading/errore vengono resi INTERNAMENTE al return principale (non con
-  // early return), altrimenti il ContrattoNuovoDialog verrebbe smontato durante
-  // il ricaricamento e perderebbe la sua success view "Nuovo contratto stesso
-  // cliente". Bug risolto §2026-07.
-  if (loading) {
-    return (
-      <>
+  // NB (§2026-09): il ContrattoNuovoDialog è renderizzato UNA SOLA VOLTA,
+  // fuori dai rami condizionali, dentro un Fragment che avvolge anche
+  // loading/errore/contenuto. Se lo mettessimo dentro ogni ramo, React lo
+  // smonterebbe passando da un ramo all'altro (loading → contenuto durante
+  // il refresh post-creazione) e perderemmo lo stato locale `justCreated`
+  // → l'utente non vedrebbe più il success view "Nuovo contratto stesso
+  // cliente". Vecchio fix (77464f7) NON funzionava perché il dialog era
+  // duplicato in due rami: passare da uno all'altro rimonta.
+  return (
+    <>
+      {/* Dialog nuovo contratto — SEMPRE MONTATO. Anche durante i refresh
+          interni (setLoading true), non viene smontato → mantiene il
+          success view del contratto appena creato. */}
+      <ContrattoNuovoDialog
+        open={nuovoOpen}
+        onClose={() => setNuovoOpen(false)}
+        onCreated={fetchAll}
+      />
+
+      {loading ? (
         <div className="flex items-center justify-center gap-2 py-16 text-text-muted">
           <Loader2 size={18} className="animate-spin" /> Caricamento dashboard…
         </div>
-        {/* Il dialog deve restare montato anche durante i reload interni */}
-        <ContrattoNuovoDialog
-          open={nuovoOpen}
-          onClose={() => setNuovoOpen(false)}
-          onCreated={fetchAll}
-        />
-      </>
-    )
-  }
-
-  if (!pdvMio) {
-    return (
-      <div className="rounded-2xl border border-warning/40 bg-warning/10 p-6 text-center">
-        <p className="text-white">Il tuo account non è collegato a un Punto Vendita.</p>
-        <p className="mt-1 text-sm text-text-muted">Contatta un amministratore.</p>
-      </div>
-    )
-  }
-
-  return (
+      ) : !pdvMio ? (
+        <div className="rounded-2xl border border-warning/40 bg-warning/10 p-6 text-center">
+          <p className="text-white">Il tuo account non è collegato a un Punto Vendita.</p>
+          <p className="mt-1 text-sm text-text-muted">Contatta un amministratore.</p>
+        </div>
+      ) : (
     <div>
       {/* Banner compleanno pirotecnico — solo collaboratori del proprio PdV */}
       <AugurioCompleanno festeggiati={festeggiati} />
@@ -242,13 +241,9 @@ export default function HomePdv() {
         <TopVenditoriPdvCard righe={topVenditoriPdv} />
       </div>
 
-      {/* Dialog nuovo contratto */}
-      <ContrattoNuovoDialog
-        open={nuovoOpen}
-        onClose={() => setNuovoOpen(false)}
-        onCreated={fetchAll}
-      />
     </div>
+      )}
+    </>
   )
 }
 
