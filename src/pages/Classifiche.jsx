@@ -33,7 +33,9 @@ import {
   classificaVenditori,
   fetchProduzioneTuttiPdv,
   getPdvScopeIds,
+  puntiFinanziamentiContratto,
 } from '@/lib/classifiche'
+import { totaleContratto } from '@/lib/dashboard'
 
 const PRODOTTI_VIS = [
   { v: 'mobile',  l: 'Mobile',  icon: Smartphone, color: 'accent' },
@@ -72,6 +74,11 @@ export default function Classifiche() {
   // Modale zoom su una singola classifica PdV per prodotto (2026-09).
   // Contiene il codice del prodotto ('mobile' | 'fisso' | 'energia') oppure null.
   const [zoomProdotto, setZoomProdotto] = useState(null)
+
+  // Modale istogramma Top 10 venditori (2026-09).
+  // serieAttive controlla quali barre appaiono (checkbox nel modal).
+  const [top10ChartOpen, setTop10ChartOpen] = useState(false)
+  const [serieAttive, setSerieAttive] = useState(() => new Set(['totale', 'mobile', 'fisso', 'energia', 'finanziamenti']))
 
   async function fetchAll() {
     setLoading(true)
@@ -120,6 +127,33 @@ export default function Classifiche() {
     () => classificaPdvFinanziamenti(contrattiGlobali),
     [contrattiGlobali]
   )
+
+  // Top 10 venditori SCOMPOSTI per prodotto + finanziamenti + totale
+  // (§2026-09): usato nella modale istogramma. Ordinati per punti totali desc.
+  const top10Scomposto = useMemo(() => {
+    const map = new Map()
+    for (const c of contrattiGlobali) {
+      const v = c.venditore
+      if (!v?.id) continue
+      if (!map.has(v.id)) {
+        map.set(v.id, {
+          venditore_id: v.id,
+          etichetta: `${v.nome} ${v.cognome}`.trim(),
+          totale: 0, mobile: 0, fisso: 0, energia: 0, finanziamenti: 0,
+        })
+      }
+      const cur = map.get(v.id)
+      const punti = totaleContratto(c).punti
+      cur.totale += punti
+      if (c.prodotto === 'mobile')  cur.mobile  += punti
+      if (c.prodotto === 'fisso')   cur.fisso   += punti
+      if (c.prodotto === 'energia') cur.energia += punti
+      cur.finanziamenti += puntiFinanziamentiContratto(c)
+    }
+    return Array.from(map.values())
+      .sort((a, b) => b.totale - a.totale)
+      .slice(0, 10)
+  }, [contrattiGlobali])
 
   const top10Venditori = useMemo(
     () => classificaVenditori(contrattiGlobali, 10, ordineGlobale),
@@ -267,6 +301,7 @@ export default function Classifiche() {
               isHighlight={isHighlightVenditore}
               ordine={ordineGlobale}
               onOrdineChange={setOrdineGlobale}
+              onOpenChart={() => setTop10ChartOpen(true)}
             />
           </div>
 
@@ -301,6 +336,16 @@ export default function Classifiche() {
         prodotto={PRODOTTI_VIS.find(p => p.v === zoomProdotto)}
         righe={zoomProdotto ? classifichePdv[zoomProdotto] : []}
         isHighlight={isHighlightPdv}
+      />
+
+      {/* Modale istogramma Top 10 venditori — con checkbox per attivare/
+          disattivare Totale / Mobile / Fisso / Energia / Finanziamenti. */}
+      <Top10VenditoriChartDialog
+        open={top10ChartOpen}
+        onClose={() => setTop10ChartOpen(false)}
+        righe={top10Scomposto}
+        serieAttive={serieAttive}
+        setSerieAttive={setSerieAttive}
       />
     </div>
   )
@@ -533,7 +578,7 @@ function ClassificaPdvFinanziamentiCard({ righe, isHighlight }) {
   )
 }
 
-function ClassificaVenditoriTable({ titolo, sottotitolo, icon: Icon, righe, isHighlight, ordine, onOrdineChange, empty }) {
+function ClassificaVenditoriTable({ titolo, sottotitolo, icon: Icon, righe, isHighlight, ordine, onOrdineChange, empty, onOpenChart }) {
   // Etichetta dinamica della colonna "contratti" in base al criterio
   const isFiltrato = ordine !== 'punti'
   const labelCriterio = ({
@@ -561,23 +606,38 @@ function ClassificaVenditoriTable({ titolo, sottotitolo, icon: Icon, righe, isHi
           </div>
         </div>
 
-        {/* Toggle criterio (cambia COMPLETAMENTE la classifica) */}
-        <div className="flex items-center gap-1 rounded-xl border border-border bg-bg p-1">
-          {ORDINAMENTI.map(o => (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Toggle criterio (cambia COMPLETAMENTE la classifica) */}
+          <div className="flex items-center gap-1 rounded-xl border border-border bg-bg p-1">
+            {ORDINAMENTI.map(o => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => onOrdineChange(o.v)}
+                className={cn(
+                  'rounded-lg px-3 py-1 text-xs font-medium transition',
+                  ordine === o.v
+                    ? 'bg-gradient-primary text-white shadow-soft'
+                    : 'text-text-muted hover:text-white',
+                )}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
+
+          {/* Bottone modalità istogramma (2026-09) */}
+          {onOpenChart && (
             <button
-              key={o.v}
               type="button"
-              onClick={() => onOrdineChange(o.v)}
-              className={cn(
-                'rounded-lg px-3 py-1 text-xs font-medium transition',
-                ordine === o.v
-                  ? 'bg-gradient-primary text-white shadow-soft'
-                  : 'text-text-muted hover:text-white',
-              )}
+              onClick={onOpenChart}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-bg px-3 py-1.5 text-xs font-medium text-white transition hover:border-accent/40 hover:bg-accent/10"
+              title="Apri visualizzazione istogramma"
             >
-              {o.l}
+              <BarChart3 size={13} />
+              Istogramma
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -827,6 +887,149 @@ function ClassificaPdvZoomDialog({ open, onClose, prodotto, righe, isHighlight }
               ))}
             </ol>
           </div>
+        </div>
+      )}
+    </Dialog>
+  )
+}
+
+// -----------------------------------------------------------------------------
+// Modale istogramma Top 10 venditori (2026-09).
+// - Barre AFFIANCATE (grouped, non stacked) — una per ogni serie attiva.
+// - Le 5 serie sono controllabili con checkbox in cima:
+//   Totale · Mobile · Fisso · Energia · Finanziamenti.
+// - Ordinamento fisso: per punti totali desc (top 10 della rete).
+// -----------------------------------------------------------------------------
+const SERIE_TOP10 = [
+  { v: 'totale',        l: 'Totale',        color: '#FFFFFF' },
+  { v: 'mobile',        l: 'Mobile',        color: '#2B6CFF' },
+  { v: 'fisso',         l: 'Fisso',         color: '#7A9BFF' },
+  { v: 'energia',       l: 'Energia',       color: '#F5B042' },
+  { v: 'finanziamenti', l: 'Finanziamenti', color: '#10B981' },
+]
+
+function Top10VenditoriChartDialog({ open, onClose, righe, serieAttive, setSerieAttive }) {
+  // Toggle di una serie (add/remove al Set)
+  function toggle(v) {
+    setSerieAttive(prev => {
+      const next = new Set(prev)
+      if (next.has(v)) next.delete(v); else next.add(v)
+      return next
+    })
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent-2">
+            <Trophy size={16} />
+          </span>
+          Top 10 venditori · Istogramma
+        </span>
+      }
+      description="Barre affiancate per ogni venditore. Attiva/disattiva le serie con i checkbox."
+    >
+      {(!righe || righe.length === 0) ? (
+        <div className="py-10 text-center text-sm text-text-muted">
+          Nessun dato per il mese selezionato.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Checkbox delle serie */}
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-bg/40 p-3">
+            {SERIE_TOP10.map(s => {
+              const attivo = serieAttive.has(s.v)
+              return (
+                <label
+                  key={s.v}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition',
+                    attivo
+                      ? 'border-transparent bg-surface text-white shadow-soft'
+                      : 'border-border bg-transparent text-text-muted hover:text-white',
+                  )}
+                  style={attivo ? { boxShadow: `inset 0 0 0 1px ${s.color}` } : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    checked={attivo}
+                    onChange={() => toggle(s.v)}
+                    className="sr-only"
+                  />
+                  <span
+                    className="h-3 w-3 rounded-sm"
+                    style={{
+                      backgroundColor: attivo ? s.color : 'transparent',
+                      border: `1.5px solid ${s.color}`,
+                    }}
+                  />
+                  {s.l}
+                </label>
+              )
+            })}
+          </div>
+
+          {/* Istogramma */}
+          <div className="h-[440px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={righe}
+                margin={{ top: 28, right: 12, left: -10, bottom: 90 }}
+                barCategoryGap="14%"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#232A4A" vertical={false} />
+                <XAxis
+                  dataKey="etichetta"
+                  stroke="#A3ADC9"
+                  fontSize={11}
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                  tickMargin={8}
+                  axisLine={{ stroke: '#232A4A' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  stroke="#A3ADC9"
+                  fontSize={12}
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  cursor={{ fill: '#FFFFFF08' }}
+                  formatter={(value, name) => [`${formatInt(value)} pt`, name]}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  formatter={(value) => <span className="text-text-muted">{value}</span>}
+                />
+                {SERIE_TOP10
+                  .filter(s => serieAttive.has(s.v))
+                  .map(s => (
+                    <Bar
+                      key={s.v}
+                      dataKey={s.v}
+                      name={s.l}
+                      fill={s.color}
+                      radius={[4, 4, 0, 0]}
+                    />
+                  ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {serieAttive.size === 0 && (
+            <p className="text-center text-xs text-text-muted">
+              Nessuna serie attiva — spunta almeno un checkbox per vedere le barre.
+            </p>
+          )}
         </div>
       )}
     </Dialog>
