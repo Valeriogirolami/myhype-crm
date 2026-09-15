@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  Cell, LabelList,
 } from 'recharts'
 import {
   Trophy, Loader2, Smartphone, Phone, Zap, Users as UsersIcon, Crown, BarChart3,
@@ -272,8 +273,25 @@ export default function Classifiche() {
 
 // ---------- sub-componenti ----------
 
+// Colori barra per prodotto (coerenti con la palette dei grafici della home)
+const COLORE_PRODOTTO = {
+  mobile:  '#2B6CFF',
+  fisso:   '#7A9BFF',
+  energia: '#F5B042',
+}
+
+/**
+ * Classifica PdV per un singolo prodotto — istogramma orizzontale (2026-09).
+ * Prima era una lista puntata: ora ogni PdV ha una sua barra proporzionale
+ * al numero di contratti. Il PdV nello scope dell'utente viene evidenziato
+ * con un colore più chiaro per farlo saltare all'occhio.
+ */
 function ClassificaPdvCard({ prodotto, righe, isHighlight }) {
   const Icon = prodotto.icon
+  const colore = COLORE_PRODOTTO[prodotto.v] || '#2B6CFF'
+  // Altezza dinamica: 32px per barra + un po' di padding, con minimo 200px
+  const alt = Math.max(200, righe.length * 32 + 30)
+
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
       <div className="flex items-center gap-2 border-b border-border bg-bg/30 px-5 py-3">
@@ -298,33 +316,69 @@ function ClassificaPdvCard({ prodotto, righe, isHighlight }) {
           Nessun contratto {prodotto.l.toLowerCase()} nel mese.
         </div>
       ) : (
-        <ol className="divide-y divide-border">
-          {righe.map((r, i) => (
-            <li
-              key={r.pdv_id}
-              className={cn(
-                'flex items-center gap-3 px-5 py-3',
-                isHighlight(r) && 'bg-warning/10',
-              )}
+        <div style={{ height: alt }} className="p-3">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={righe}
+              layout="vertical"
+              margin={{ top: 6, right: 40, left: 0, bottom: 6 }}
+              barCategoryGap={6}
             >
-              <PosBadge pos={i + 1} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-white">{r.pdv_nome}</div>
-                <div className="text-[11px] text-text-muted">
-                  {r.pdv_tipo === 'sinergia' ? 'Sinergia' : 'Galleria'} · Area {r.pdv_area}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-base font-medium tabular-nums text-white">
-                  {formatInt(r.contratti)}
-                </div>
-                <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                  {r.contratti === 1 ? 'contratto' : 'contratti'}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
+              <CartesianGrid strokeDasharray="3 3" stroke="#232A4A" horizontal={false} />
+              <XAxis
+                type="number"
+                allowDecimals={false}
+                stroke="#A3ADC9"
+                fontSize={11}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                type="category"
+                dataKey="pdv_nome"
+                stroke="#A3ADC9"
+                fontSize={11}
+                width={110}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                cursor={{ fill: '#FFFFFF08' }}
+                formatter={(value) => [
+                  `${formatInt(value)} ${value === 1 ? 'contratto' : 'contratti'}`,
+                  prodotto.l,
+                ]}
+                labelFormatter={(label, items) => {
+                  const r = items?.[0]?.payload
+                  if (!r) return label
+                  const tipo = r.pdv_tipo === 'sinergia' ? 'Sinergia' : 'Galleria'
+                  return `${label} · ${tipo} · Area ${r.pdv_area}`
+                }}
+              />
+              <Bar dataKey="contratti" radius={[0, 6, 6, 0]}>
+                {righe.map((r) => (
+                  <Cell
+                    key={r.pdv_id}
+                    fill={colore}
+                    // PdV nello scope utente: alone + saturazione piena; altrimenti
+                    // uso lo stesso colore ma leggermente più opaco
+                    fillOpacity={isHighlight(r) ? 1 : 0.75}
+                    stroke={isHighlight(r) ? '#FFFFFF' : 'transparent'}
+                    strokeWidth={isHighlight(r) ? 1 : 0}
+                  />
+                ))}
+                <LabelList
+                  dataKey="contratti"
+                  position="right"
+                  fill="#FFFFFF"
+                  fontSize={11}
+                  formatter={(v) => formatInt(v)}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   )
