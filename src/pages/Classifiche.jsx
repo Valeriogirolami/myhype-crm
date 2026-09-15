@@ -18,6 +18,7 @@ import {
 } from 'recharts'
 import {
   Trophy, Loader2, Smartphone, Phone, Zap, Users as UsersIcon, Crown, BarChart3,
+  Banknote,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
@@ -28,6 +29,7 @@ import Dialog from '@/components/ui/Dialog'
 import {
   fetchContrattiPerClassifiche,
   classificaPdvPerProdotto,
+  classificaPdvFinanziamenti,
   classificaVenditori,
   fetchProduzioneTuttiPdv,
   getPdvScopeIds,
@@ -40,11 +42,14 @@ const PRODOTTI_VIS = [
 ]
 
 // Bottoni toggle ordinamento classifica venditori
+// 'finanziamenti' aggiunto 2026-09: filtra i contratti con sottoprodotti
+// FINANZIAMENTO e ordina per punti SOLO di quei sottoprodotti.
 const ORDINAMENTI = [
-  { v: 'punti',   l: 'Punti totali' },
-  { v: 'mobile',  l: 'Mobile' },
-  { v: 'fisso',   l: 'Fisso' },
-  { v: 'energia', l: 'Energia' },
+  { v: 'punti',         l: 'Totale' },
+  { v: 'mobile',        l: 'Mobile' },
+  { v: 'fisso',         l: 'Fisso' },
+  { v: 'energia',       l: 'Energia' },
+  { v: 'finanziamenti', l: 'Finanziamenti' },
 ]
 
 export default function Classifiche() {
@@ -108,6 +113,13 @@ export default function Classifiche() {
     fisso:   classificaPdvPerProdotto(contrattiGlobali, 'fisso'),
     energia: classificaPdvPerProdotto(contrattiGlobali, 'energia'),
   }), [contrattiGlobali])
+
+  // Classifica PdV per punti dei sottoprodotti FINANZIAMENTO (§2026-09).
+  // Ordinata per punti desc, esclude PdV con 0 punti finanziamento.
+  const classificaFin = useMemo(
+    () => classificaPdvFinanziamenti(contrattiGlobali),
+    [contrattiGlobali]
+  )
 
   const top10Venditori = useMemo(
     () => classificaVenditori(contrattiGlobali, 10, ordineGlobale),
@@ -238,6 +250,12 @@ export default function Classifiche() {
               />
             ))}
           </div>
+
+          {/* === Istogramma unico: Classifica PdV · Finanziamenti (punti) === */}
+          <ClassificaPdvFinanziamentiCard
+            righe={classificaFin}
+            isHighlight={isHighlightPdv}
+          />
 
           {/* === Tabella Top 10 venditori === */}
           <div className="mt-6">
@@ -407,12 +425,124 @@ function ClassificaPdvCard({ prodotto, righe, isHighlight, onZoom }) {
   )
 }
 
+/**
+ * Classifica PdV per PUNTI dei sottoprodotti FINANZIAMENTO (§2026-09).
+ * Un singolo istogramma verticale, stile coerente con quelli sopra.
+ * I punti dei sottoprodotti sono presi dinamicamente dal DB — se domani
+ * cambio i punti nel cruscotto prodotti, la classifica si aggiorna.
+ */
+function ClassificaPdvFinanziamentiCard({ righe, isHighlight }) {
+  // Colore dedicato ai finanziamenti (verde emerald — distinto da mobile/fisso/energia)
+  const colore = '#10B981'
+  const totalePunti = (righe || []).reduce((s, r) => s + (r.punti || 0), 0)
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-soft">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-xl"
+            style={{ background: `${colore}22`, color: colore }}
+          >
+            <Banknote size={16} />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium uppercase tracking-wider text-white">
+              PdV · Finanziamenti (punti)
+            </h3>
+            <p className="text-[11px] text-text-muted">
+              Somma dei punti dei sottoprodotti FINANZIAMENTO 1/2/3 PRODOTTI (dinamici dal cruscotto)
+            </p>
+          </div>
+        </div>
+        <span className="text-xs text-text-muted">
+          Totale: <span className="tabular-nums text-white">{formatInt(totalePunti)}</span> pt
+        </span>
+      </div>
+
+      {(!righe || righe.length === 0) ? (
+        <div className="flex h-56 items-center justify-center text-sm text-text-muted">
+          Nessun contratto con sottoprodotto Finanziamento nel mese.
+        </div>
+      ) : (
+        <div className="mt-5 h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={righe}
+              margin={{ top: 24, right: 12, left: -10, bottom: 70 }}
+              barCategoryGap="18%"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#232A4A" vertical={false} />
+              <XAxis
+                dataKey="pdv_nome"
+                stroke="#A3ADC9"
+                fontSize={11}
+                angle={-30}
+                textAnchor="end"
+                interval={0}
+                tickMargin={8}
+                axisLine={{ stroke: '#232A4A' }}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#A3ADC9"
+                fontSize={12}
+                allowDecimals={false}
+                axisLine={false}
+                tickLine={false}
+                width={36}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                cursor={{ fill: '#FFFFFF08' }}
+                formatter={(value, _n, item) => {
+                  const r = item?.payload
+                  const linea1 = `${formatInt(value)} pt`
+                  const linea2 = r?.contratti ? ` (${formatInt(r.contratti)} contratti)` : ''
+                  return [linea1 + linea2, 'Finanziamenti']
+                }}
+                labelFormatter={(label, items) => {
+                  const r = items?.[0]?.payload
+                  if (!r) return label
+                  const tipo = r.pdv_tipo === 'sinergia' ? 'Sinergia' : 'Galleria'
+                  return `${label} · ${tipo} · Area ${r.pdv_area}`
+                }}
+              />
+              <Bar dataKey="punti" radius={[6, 6, 0, 0]}>
+                {righe.map((r) => (
+                  <Cell
+                    key={r.pdv_id}
+                    fill={colore}
+                    stroke={isHighlight(r) ? '#FFFFFF' : 'transparent'}
+                    strokeWidth={isHighlight(r) ? 1 : 0}
+                  />
+                ))}
+                <LabelList
+                  dataKey="punti"
+                  position="top"
+                  fill="#FFFFFF"
+                  fontSize={11}
+                  formatter={(v) => formatInt(v)}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ClassificaVenditoriTable({ titolo, sottotitolo, icon: Icon, righe, isHighlight, ordine, onOrdineChange, empty }) {
   // Etichetta dinamica della colonna "contratti" in base al criterio
   const isFiltrato = ordine !== 'punti'
-  const labelProdotto = ({
+  const labelCriterio = ({
     mobile: 'Mobile', fisso: 'Fisso', energia: 'Energia',
+    finanziamenti: 'Finanziamenti',
   })[ordine]
+  const sottotitoloFiltrato = ordine === 'finanziamenti'
+    ? `Classifica Finanziamenti · solo contratti con sottoprodotti FINANZIAMENTO (${righe.length})`
+    : `Classifica ${labelCriterio} · solo contratti ${labelCriterio} (${righe.length})`
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
@@ -426,9 +556,7 @@ function ClassificaVenditoriTable({ titolo, sottotitolo, icon: Icon, righe, isHi
               {titolo}
             </div>
             <div className="text-[11px] text-text-muted">
-              {isFiltrato
-                ? `Classifica ${labelProdotto} · solo contratti ${labelProdotto} (${righe.length})`
-                : sottotitolo}
+              {isFiltrato ? sottotitoloFiltrato : sottotitolo}
             </div>
           </div>
         </div>
@@ -458,7 +586,7 @@ function ClassificaVenditoriTable({ titolo, sottotitolo, icon: Icon, righe, isHi
       ) : righe.length === 0 ? (
         <div className="p-6 text-center text-sm text-text-muted">
           {isFiltrato
-            ? `Nessun venditore con contratti ${labelProdotto} nel mese.`
+            ? `Nessun venditore con contratti ${labelCriterio} nel mese.`
             : 'Nessun venditore con punti nel mese.'}
         </div>
       ) : (
@@ -470,8 +598,8 @@ function ClassificaVenditoriTable({ titolo, sottotitolo, icon: Icon, righe, isHi
                 <th className="px-5 py-3 font-medium">Venditore</th>
                 {isFiltrato ? (
                   <>
-                    <th className="px-3 py-3 text-right font-medium">Contratti {labelProdotto}</th>
-                    <th className="px-5 py-3 text-right font-medium">Punti {labelProdotto}</th>
+                    <th className="px-3 py-3 text-right font-medium">Contratti {labelCriterio}</th>
+                    <th className="px-5 py-3 text-right font-medium">Punti {labelCriterio}</th>
                   </>
                 ) : (
                   <>

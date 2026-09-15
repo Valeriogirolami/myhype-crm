@@ -25,7 +25,7 @@ export async function fetchContrattiPerClassifiche(ym, opzioni = {}) {
       fatturato_pdv_snap, punti_snap,
       pdv:pdv(id, nome, tipo, area, categoria, account_id),
       venditore:collaboratori(id, nome, cognome, ruolo, account_id),
-      contratto_sottoprodotti(sottoprodotti(punti, fatturato_pdv))
+      contratto_sottoprodotti(sottoprodotti(nome, punti, fatturato_pdv))
     `)
     // Le classifiche si calcolano sulla DATA STIPULA (commercialmente rilevante),
     // NON sulla data di registrazione a sistema.
@@ -38,6 +38,60 @@ export async function fetchContrattiPerClassifiche(ym, opzioni = {}) {
   const { data, error } = await q
   if (error) throw error
   return data || []
+}
+
+/**
+ * Ritorna true se il sottoprodotto è un "FINANZIAMENTO" (case-insensitive
+ * match sul nome). Copre le varianti "FINANZIAMENTO 1/2/3 PRODOTTI" e simili.
+ * (§2026-09)
+ */
+export function isFinanziamento(sp) {
+  const nome = (sp?.nome || '').toLowerCase()
+  return nome.includes('finanziamento')
+}
+
+/**
+ * Ritorna i punti sommati dei soli sottoprodotti "FINANZIAMENTO" collegati al
+ * contratto. Usa i valori CORRENTI dei sottoprodotti (§sottoprodotti.punti),
+ * quindi rispecchia sempre l'ultima configurazione del cruscotto prodotti
+ * anche per contratti gettonati o stornati (lo snapshot punti_snap non è
+ * scomponibile per sottoprodotto).
+ */
+export function puntiFinanziamentiContratto(contratto) {
+  const sps = (contratto.contratto_sottoprodotti || [])
+    .map(r => r.sottoprodotti)
+    .filter(Boolean)
+  return sps
+    .filter(isFinanziamento)
+    .reduce((s, sp) => s + (sp.punti || 0), 0)
+}
+
+/**
+ * Classifica PdV per PUNTI dei sottoprodotti FINANZIAMENTO (§2026-09).
+ * Include solo i PdV che hanno almeno 1 punto finanziamento nel mese.
+ */
+export function classificaPdvFinanziamenti(contratti) {
+  const map = new Map()
+  for (const c of contratti) {
+    const punti = puntiFinanziamentiContratto(c)
+    if (punti === 0) continue
+    const id = c.pdv?.id
+    if (!id) continue
+    const cur = map.get(id) || {
+      pdv_id: id,
+      pdv_nome: c.pdv.nome,
+      pdv_tipo: c.pdv.tipo,
+      pdv_area: c.pdv.area,
+      pdv_account_id: c.pdv.account_id,
+      punti: 0,
+      contratti: 0,
+    }
+    cur.punti += punti
+    cur.contratti += 1
+    map.set(id, cur)
+  }
+  return Array.from(map.values())
+    .sort((a, b) => b.punti - a.punti || b.contratti - a.contratti)
 }
 
 /**
@@ -71,21 +125,30 @@ export function classificaPdvPerProdotto(contratti, prodotto) {
  * Classifica venditori (§10.1).
  *
  * `criterio`:
- *  - 'punti'   → considera TUTTI i contratti, ordina per punti totali
- *  - 'mobile'  → considera SOLO i contratti Mobile, ordina per punti Mobile
- *  - 'fisso'   → considera SOLO i contratti Fisso, ordina per punti Fisso
- *  - 'energia' → considera SOLO i contratti Energia, ordina per punti Energia
+ *  - 'punti'         → considera TUTTI i contratti, ordina per punti totali
+ *  - 'mobile'        → considera SOLO i contratti Mobile, ordina per punti Mobile
+ *  - 'fisso'         → considera SOLO i contratti Fisso, ordina per punti Fisso
+ *  - 'energia'       → considera SOLO i contratti Energia, ordina per punti Energia
+ *  - 'finanziamenti' → considera SOLO i contratti che hanno almeno un
+ *                       sottoprodotto FINANZIAMENTO, ordina per punti dei
+ *                       soli sottoprodotti Finanziamento (§2026-09)
  *
- * Quando si filtra per prodotto, escono dalla classifica i venditori che NON
- * hanno fatto contratti di quel prodotto (perché avrebbero 0 punti).
+ * Quando si filtra per prodotto (o finanziamenti), escono dalla classifica
+ * i venditori che NON hanno contratti di quel tipo (avrebbero 0 punti).
  *
  * `limit` = numero massimo (es. 10 per top globale, null per illimitato).
  */
 export function classificaVenditori(contratti, limit = 10, criterio = 'punti') {
-  // Se il criterio è un prodotto, filtro i contratti
-  const contrattiFiltrati = criterio === 'punti'
-    ? contratti
-    : contratti.filter(c => c.prodotto === criterio)
+  const isFin = criterio === 'finanziamenti'
+  const isProd = criterio === 'mobile' || criterio === 'fisso' || criterio === 'energia'
+
+  // Se il criterio è un prodotto, filtro i contratti direttamente.
+  // Se è finanziamenti, filtro quelli con almeno un sottoprodotto Finanziamento.
+  const contrattiFiltrati = isProd
+    ? contratti.filter(c => c.prodotto === criterio)
+    : isFin
+      ? contratti.filter(c => puntiFinanziamentiContratto(c) > 0)
+      : contratti
 
   const map = new Map()
   for (const c of contrattiFiltrati) {
@@ -107,8 +170,9 @@ export function classificaVenditori(contratti, limit = 10, criterio = 'punti') {
     if (c.prodotto === 'mobile')  cur.ctr_mobile += 1
     if (c.prodotto === 'fisso')   cur.ctr_fisso += 1
     if (c.prodotto === 'energia') cur.ctr_energia += 1
-    const t = totaleContratto(c)
-    cur.punti += t.punti
+    // Se il criterio è "finanziamenti" sommo SOLO i punti finanziamento;
+    // per gli altri criteri sommo i punti totali del contratto.
+    cur.punti += isFin ? puntiFinanziamentiContratto(c) : totaleContratto(c).punti
     map.set(v.id, cur)
   }
   const arr = Array.from(map.values())
