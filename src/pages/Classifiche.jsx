@@ -24,6 +24,7 @@ import { toast } from '@/lib/toast'
 import { cn, formatInt } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import MesePicker from '@/components/ui/MesePicker'
+import Dialog from '@/components/ui/Dialog'
 import {
   fetchContrattiPerClassifiche,
   classificaPdvPerProdotto,
@@ -62,6 +63,10 @@ export default function Classifiche() {
   // Toggle ordinamento per le 2 tabelle venditori (separati per indipendenza)
   const [ordineGlobale, setOrdineGlobale] = useState('punti')
   const [ordineInterna, setOrdineInterna] = useState('punti')
+
+  // Modale zoom su una singola classifica PdV per prodotto (2026-09).
+  // Contiene il codice del prodotto ('mobile' | 'fisso' | 'energia') oppure null.
+  const [zoomProdotto, setZoomProdotto] = useState(null)
 
   async function fetchAll() {
     setLoading(true)
@@ -229,6 +234,7 @@ export default function Classifiche() {
                 prodotto={p}
                 righe={classifichePdv[p.v]}
                 isHighlight={isHighlightPdv}
+                onZoom={() => setZoomProdotto(p.v)}
               />
             ))}
           </div>
@@ -267,6 +273,17 @@ export default function Classifiche() {
           )}
         </>
       )}
+
+      {/* Modale zoom classifica PdV per prodotto — si apre al click su una
+          delle 3 card e mostra l'istogramma in versione grande. Si chiude
+          cliccando fuori (dismissOnBackdrop default) o con ESC/✕. */}
+      <ClassificaPdvZoomDialog
+        open={!!zoomProdotto}
+        onClose={() => setZoomProdotto(null)}
+        prodotto={PRODOTTI_VIS.find(p => p.v === zoomProdotto)}
+        righe={zoomProdotto ? classifichePdv[zoomProdotto] : []}
+        isHighlight={isHighlightPdv}
+      />
     </div>
   )
 }
@@ -286,12 +303,19 @@ const COLORE_PRODOTTO = {
  * al numero di contratti. Il PdV nello scope dell'utente viene evidenziato
  * con un colore più chiaro per farlo saltare all'occhio.
  */
-function ClassificaPdvCard({ prodotto, righe, isHighlight }) {
+function ClassificaPdvCard({ prodotto, righe, isHighlight, onZoom }) {
   const Icon = prodotto.icon
   const colore = COLORE_PRODOTTO[prodotto.v] || '#2B6CFF'
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+    <div
+      onClick={onZoom}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onZoom?.()}
+      className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg"
+      title={`Espandi classifica ${prodotto.l}`}
+    >
       <div className="flex items-center gap-2 border-b border-border bg-bg/30 px-5 py-3">
         <div className={cn(
           'flex h-9 w-9 items-center justify-center rounded-xl',
@@ -543,4 +567,140 @@ const tooltipStyle = {
 function currentYM() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Modale "zoom" sulla classifica PdV per un singolo prodotto (2026-09).
+ * Al click su una delle 3 card apre un Dialog grande con lo stesso
+ * istogramma verticale + tabellina completa sotto (PdV, tipo, area, contratti).
+ * Click sul backdrop / ESC / ✕ chiudono.
+ */
+function ClassificaPdvZoomDialog({ open, onClose, prodotto, righe, isHighlight }) {
+  if (!prodotto) return null
+  const colore = COLORE_PRODOTTO[prodotto.v] || '#2B6CFF'
+  const Icon = prodotto.icon
+  const totaleContratti = (righe || []).reduce((s, r) => s + (r.contratti || 0), 0)
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <span
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl"
+            style={{ background: `${colore}22`, color: colore }}
+          >
+            <Icon size={16} />
+          </span>
+          Classifica PdV · {prodotto.l}
+        </span>
+      }
+      description={`${righe?.length || 0} PdV nel mese · ${formatInt(totaleContratti)} contratti totali`}
+    >
+      {(!righe || righe.length === 0) ? (
+        <div className="py-10 text-center text-sm text-text-muted">
+          Nessun contratto {prodotto.l.toLowerCase()} nel mese.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Istogramma grande */}
+          <div className="h-[420px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={righe}
+                margin={{ top: 28, right: 12, left: -10, bottom: 80 }}
+                barCategoryGap="18%"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#232A4A" vertical={false} />
+                <XAxis
+                  dataKey="pdv_nome"
+                  stroke="#A3ADC9"
+                  fontSize={11}
+                  angle={-30}
+                  textAnchor="end"
+                  interval={0}
+                  tickMargin={8}
+                  axisLine={{ stroke: '#232A4A' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  stroke="#A3ADC9"
+                  fontSize={12}
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                  width={32}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  cursor={{ fill: '#FFFFFF08' }}
+                  formatter={(value) => [
+                    `${formatInt(value)} ${value === 1 ? 'contratto' : 'contratti'}`,
+                    prodotto.l,
+                  ]}
+                  labelFormatter={(label, items) => {
+                    const r = items?.[0]?.payload
+                    if (!r) return label
+                    const tipo = r.pdv_tipo === 'sinergia' ? 'Sinergia' : 'Galleria'
+                    return `${label} · ${tipo} · Area ${r.pdv_area}`
+                  }}
+                />
+                <Bar dataKey="contratti" radius={[6, 6, 0, 0]}>
+                  {righe.map((r) => (
+                    <Cell
+                      key={r.pdv_id}
+                      fill={colore}
+                      stroke={isHighlight(r) ? '#FFFFFF' : 'transparent'}
+                      strokeWidth={isHighlight(r) ? 1.5 : 0}
+                    />
+                  ))}
+                  <LabelList
+                    dataKey="contratti"
+                    position="top"
+                    fill="#FFFFFF"
+                    fontSize={12}
+                    formatter={(v) => formatInt(v)}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Tabellina completa sotto il grafico */}
+          <div className="overflow-hidden rounded-xl border border-border">
+            <div className="grid grid-cols-[36px_1fr_120px_60px_80px] gap-2 border-b border-border bg-bg/40 px-4 py-2 text-[11px] uppercase tracking-wider text-text-muted">
+              <span>#</span>
+              <span>PdV</span>
+              <span>Tipo</span>
+              <span>Area</span>
+              <span className="text-right">Contratti</span>
+            </div>
+            <ol className="divide-y divide-border">
+              {righe.map((r, i) => (
+                <li
+                  key={r.pdv_id}
+                  className={cn(
+                    'grid grid-cols-[36px_1fr_120px_60px_80px] items-center gap-2 px-4 py-2 text-sm',
+                    isHighlight(r) && 'bg-warning/10',
+                  )}
+                >
+                  <PosBadge pos={i + 1} />
+                  <span className="truncate text-white">{r.pdv_nome}</span>
+                  <span className="text-text-muted">
+                    {r.pdv_tipo === 'sinergia' ? 'Sinergia' : 'Galleria'}
+                  </span>
+                  <span className="text-text-muted tabular-nums">{r.pdv_area}</span>
+                  <span className="text-right font-medium tabular-nums text-white">
+                    {formatInt(r.contratti)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  )
 }
