@@ -165,149 +165,15 @@ export async function notificaVenditoreDisattivato({ collaboratoreId, nomeVendit
 }
 
 /**
- * Notifica Top 3 (§13 / §10.4) — da chiamare dopo creazione/modifica contratto.
- *
- * Ricalcola le classifiche del mese e, se PdV o venditore è in top 3 e non
- * ha già ricevuto la notifica per quel mese/categoria, ne crea una.
- *
- * Idempotente per mese: usa un marker nel testo della notifica per evitare
- * duplicati. Marker formato: "[top3:<categoria>:<YYYY-MM>:<id>]"
+ * @deprecated 2026-09 — Notifiche Top 3 classifiche rimosse su richiesta
+ * dell'utente (le classifiche si consultano già nella pagina dedicata,
+ * senza bisogno di notifiche push). Manteniamo la funzione come no-op per
+ * retrocompatibilità con eventuali chiamate ancora presenti.
  */
-export async function notificaTop3PerMese(ym) {
-  try {
-    // 1) Contratti del mese (per data sottoscrizione, stati produttivi)
-    const start = `${ym}-01`
-    // ultimo giorno del mese
-    const [y, m] = ym.split('-').map(Number)
-    const last = new Date(y, m, 0).getDate()
-    const end = `${ym}-${String(last).padStart(2, '0')}`
-
-    const { data: contratti, error } = await supabase
-      .from('contratti')
-      .select(`
-        id, prodotto, stato, punti_snap,
-        pdv:pdv(id, nome, account_id),
-        venditore:collaboratori(id, nome, cognome, account_id),
-        contratto_sottoprodotti(sottoprodotti(punti))
-      `)
-      // Notifiche top 3: uso data_stipula per coerenza con classifiche
-      .gte('data_stipula', start)
-      .lte('data_stipula', end)
-      .in('stato', ['validato', 'gettonato', 'stornato'])
-    if (error) throw error
-
-    // 2) Calcolo top 3 PdV per ciascun prodotto
-    const top3PerProdotto = {}
-    for (const prodotto of ['mobile', 'fisso', 'energia']) {
-      const map = new Map()
-      for (const c of contratti || []) {
-        if (c.prodotto !== prodotto || !c.pdv?.id) continue
-        const cur = map.get(c.pdv.id) || { ...c.pdv, count: 0 }
-        cur.count += 1
-        map.set(c.pdv.id, cur)
-      }
-      top3PerProdotto[prodotto] = Array.from(map.values())
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 3)
-    }
-
-    // 3) Top 3 venditori per punti totali
-    const venMap = new Map()
-    for (const c of contratti || []) {
-      const v = c.venditore
-      if (!v?.id) continue
-      const punti = (c.stato === 'gettonato' || c.stato === 'stornato')
-        ? (c.punti_snap || 0)
-        : (c.contratto_sottoprodotti || []).reduce((s, r) => s + (r.sottoprodotti?.punti || 0), 0)
-      const cur = venMap.get(v.id) || {
-        id: v.id, nome: v.nome, cognome: v.cognome, account_id: v.account_id, punti: 0,
-      }
-      cur.punti += punti
-      // Salvo anche un PdV di riferimento per trovare TM/AS (uno qualunque dei suoi contratti)
-      cur.pdv_id = c.pdv?.id
-      venMap.set(v.id, cur)
-    }
-    const top3Venditori = Array.from(venMap.values())
-      .sort((a, b) => b.punti - a.punti)
-      .slice(0, 3)
-
-    // 4) Genero notifiche, evitando duplicati
-    const notificheDaCreare = []
-
-    // Helper: trova destinatari di un PdV (account PdV + TM + AS del PdV)
-    async function destinatariDelPdv(pdvId) {
-      if (!pdvId) return []
-      const ids = new Set()
-      const { data: pdv } = await supabase
-        .from('pdv').select('account_id').eq('id', pdvId).maybeSingle()
-      if (pdv?.account_id) ids.add(pdv.account_id)
-      const { data: assoc } = await supabase
-        .from('pdv_collaboratori')
-        .select('ruolo_nel_pdv, collaboratori(account_id)')
-        .eq('pdv_id', pdvId)
-        .in('ruolo_nel_pdv', ['tm', 'as'])
-      for (const a of assoc || []) {
-        if (a.collaboratori?.account_id) ids.add(a.collaboratori.account_id)
-      }
-      return Array.from(ids)
-    }
-
-    // Top 3 PdV per prodotto
-    for (const prodotto of ['mobile', 'fisso', 'energia']) {
-      const labelProd = prodotto.charAt(0).toUpperCase() + prodotto.slice(1)
-      const top3 = top3PerProdotto[prodotto]
-      for (let i = 0; i < top3.length; i++) {
-        const pos = i + 1
-        const p = top3[i]
-        const marker = `[top3:pdv:${prodotto}:${ym}:${p.id}]`
-        const dest = await destinatariDelPdv(p.id)
-        for (const d of dest) {
-          // Verifica esistenza
-          const { data: ex } = await supabase
-            .from('notifiche').select('id')
-            .eq('destinatario', d).like('testo', `%${marker}%`).limit(1)
-          if (ex && ex.length > 0) continue
-          notificheDaCreare.push({
-            destinatario: d,
-            titolo: `🏆 ${pos}° posto Top ${labelProd}`,
-            testo: `Complimenti! ${p.nome} è entrato nella top 3 ${labelProd} di ${ym}. ${marker}`,
-            link: '/classifiche',
-          })
-        }
-      }
-    }
-
-    // Top 3 venditori per punti
-    for (let i = 0; i < top3Venditori.length; i++) {
-      const pos = i + 1
-      const v = top3Venditori[i]
-      const marker = `[top3:vend:punti:${ym}:${v.id}]`
-      // Destinatari: l'account venditore (se esiste) + TM/AS del PdV di riferimento + PdV stesso
-      const dest = new Set()
-      if (v.account_id) dest.add(v.account_id)
-      const altri = await destinatariDelPdv(v.pdv_id)
-      altri.forEach(a => dest.add(a))
-      for (const d of dest) {
-        const { data: ex } = await supabase
-          .from('notifiche').select('id')
-          .eq('destinatario', d).like('testo', `%${marker}%`).limit(1)
-        if (ex && ex.length > 0) continue
-        notificheDaCreare.push({
-          destinatario: d,
-          titolo: `🏆 ${pos}° posto Top venditori`,
-          testo: `${v.nome} ${v.cognome} è in top 3 venditori per punti di ${ym}. ${marker}`,
-          link: '/classifiche',
-        })
-      }
-    }
-
-    if (notificheDaCreare.length > 0) {
-      await creaNotifiche(notificheDaCreare)
-    }
-  } catch (err) {
-    console.error('[notifiche/top3]:', err.message)
-  }
+export async function notificaTop3PerMese(_ym) {
+  // no-op — funzione mantenuta per retrocompatibilità
 }
+
 
 /**
  * Notifica al BO/Admin: ci sono contratti "Da validare" fermi da > 3 giorni (§13).

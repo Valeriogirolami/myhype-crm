@@ -27,7 +27,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
-import { notificaKoContratto, notificaTop3PerMese } from '@/lib/notifiche'
+import { notificaKoContratto } from '@/lib/notifiche'
 import { cn, formatDate, formatEuro, formatInt } from '@/lib/utils'
 import { STATI, PRODOTTI, calcolaTotali, nomeCliente } from '@/lib/contratti'
 
@@ -326,14 +326,8 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
         })
       }
 
-      // Notifica Top 3 (§10.4 / §13) — se il contratto è (o resta) in stato produttivo,
-      // ricalcolo le top 3 del mese e mando notifiche ai nuovi entranti
-      const statiProduttivi = ['validato', 'gettonato', 'stornato']
-      if (statiProduttivi.includes(updates.stato) && (data.data_stipula || data.data_sottoscrizione)) {
-        // Uso data_stipula come mese di competenza (data commercialmente rilevante)
-        const ym = (data.data_stipula || data.data_sottoscrizione).slice(0, 7)
-        notificaTop3PerMese(ym)  // fire-and-forget, non blocca il salvataggio
-      }
+      // Notifica Top 3 classifiche rimossa 2026-09 (richiesta Valerio):
+      // le classifiche sono già visibili nella pagina dedicata, senza push.
 
       toast.success(messaggio)
       cancelQuickAction()
@@ -580,14 +574,8 @@ export default function ContrattoDettaglioDialog({ open, onClose, contrattoId, o
         })
       }
 
-      // Notifica Top 3 (§10.4) anche dopo modifica completa
-      // Uso data_stipula (aggiornata) come mese di competenza commerciale
-      const statiProduttivi = ['validato', 'gettonato', 'stornato']
-      const dataMese = updates.data_stipula || data.data_stipula || data.data_sottoscrizione
-      if (statiProduttivi.includes(nuovoStato) && dataMese) {
-        const ym = dataMese.slice(0, 7)
-        notificaTop3PerMese(ym)
-      }
+      // Notifica Top 3 classifiche rimossa 2026-09 (richiesta Valerio):
+      // le classifiche sono già visibili nella pagina dedicata, senza push.
 
       toast.success('Contratto aggiornato.')
       setEditing(false)
