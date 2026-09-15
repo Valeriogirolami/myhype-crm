@@ -289,8 +289,6 @@ const COLORE_PRODOTTO = {
 function ClassificaPdvCard({ prodotto, righe, isHighlight }) {
   const Icon = prodotto.icon
   const colore = COLORE_PRODOTTO[prodotto.v] || '#2B6CFF'
-  // Altezza dinamica: 32px per barra + un po' di padding, con minimo 200px
-  const alt = Math.max(200, righe.length * 32 + 30)
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
@@ -316,31 +314,32 @@ function ClassificaPdvCard({ prodotto, righe, isHighlight }) {
           Nessun contratto {prodotto.l.toLowerCase()} nel mese.
         </div>
       ) : (
-        <div style={{ height: alt }} className="p-3">
+        <div className="h-[320px] p-3">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={righe}
-              layout="vertical"
-              margin={{ top: 6, right: 40, left: 0, bottom: 6 }}
-              barCategoryGap={6}
+              margin={{ top: 24, right: 12, left: -10, bottom: 70 }}
+              barCategoryGap="18%"
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#232A4A" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#232A4A" vertical={false} />
               <XAxis
-                type="number"
-                allowDecimals={false}
-                stroke="#A3ADC9"
-                fontSize={11}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                type="category"
                 dataKey="pdv_nome"
                 stroke="#A3ADC9"
                 fontSize={11}
-                width={110}
+                angle={-30}
+                textAnchor="end"
+                interval={0}
+                tickMargin={8}
+                axisLine={{ stroke: '#232A4A' }}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#A3ADC9"
+                fontSize={12}
+                allowDecimals={false}
                 axisLine={false}
                 tickLine={false}
+                width={30}
               />
               <Tooltip
                 contentStyle={tooltipStyle}
@@ -356,21 +355,21 @@ function ClassificaPdvCard({ prodotto, righe, isHighlight }) {
                   return `${label} · ${tipo} · Area ${r.pdv_area}`
                 }}
               />
-              <Bar dataKey="contratti" radius={[0, 6, 6, 0]}>
+              <Bar dataKey="contratti" radius={[6, 6, 0, 0]}>
                 {righe.map((r) => (
                   <Cell
                     key={r.pdv_id}
                     fill={colore}
-                    // PdV nello scope utente: alone + saturazione piena; altrimenti
-                    // uso lo stesso colore ma leggermente più opaco
-                    fillOpacity={isHighlight(r) ? 1 : 0.75}
+                    // PdV nello scope utente: bordo bianco per farlo saltare all'occhio.
+                    // Gli altri restano nel colore prodotto pieno.
                     stroke={isHighlight(r) ? '#FFFFFF' : 'transparent'}
                     strokeWidth={isHighlight(r) ? 1 : 0}
                   />
                 ))}
+                {/* Etichetta con il numero sopra ogni barra */}
                 <LabelList
                   dataKey="contratti"
-                  position="right"
+                  position="top"
                   fill="#FFFFFF"
                   fontSize={11}
                   formatter={(v) => formatInt(v)}
