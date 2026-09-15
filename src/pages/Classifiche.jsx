@@ -973,13 +973,16 @@ function Top10VenditoriChartDialog({ open, onClose, righe, serieAttive, setSerie
             })}
           </div>
 
-          {/* Istogramma */}
-          <div className="h-[440px]">
+          {/* Istogramma — NO Legend recharts perché i checkbox in alto
+              fanno già da legenda. Bottom margin ampio per non tagliare i
+              nomi ruotati dei venditori. */}
+          <div className="h-[500px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={righe}
-                margin={{ top: 28, right: 12, left: -10, bottom: 90 }}
-                barCategoryGap="14%"
+                margin={{ top: 28, right: 16, left: 0, bottom: 110 }}
+                barCategoryGap="18%"
+                barGap={2}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#232A4A" vertical={false} />
                 <XAxis
@@ -989,9 +992,10 @@ function Top10VenditoriChartDialog({ open, onClose, righe, serieAttive, setSerie
                   angle={-35}
                   textAnchor="end"
                   interval={0}
-                  tickMargin={8}
+                  tickMargin={10}
                   axisLine={{ stroke: '#232A4A' }}
                   tickLine={false}
+                  height={100}
                 />
                 <YAxis
                   stroke="#A3ADC9"
@@ -999,17 +1003,15 @@ function Top10VenditoriChartDialog({ open, onClose, righe, serieAttive, setSerie
                   allowDecimals={false}
                   axisLine={false}
                   tickLine={false}
-                  width={36}
+                  width={42}
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}
                   cursor={{ fill: '#FFFFFF08' }}
                   formatter={(value, name) => [`${formatInt(value)} pt`, name]}
                 />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                  formatter={(value) => <span className="text-text-muted">{value}</span>}
-                />
+                {/* Le barre rispettano l'ordine di SERIE_TOP10 (Totale sempre
+                    primo, poi Mobile · Fisso · Energia · Finanziamenti). */}
                 {SERIE_TOP10
                   .filter(s => serieAttive.has(s.v))
                   .map(s => (
