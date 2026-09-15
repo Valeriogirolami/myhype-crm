@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/lib/toast'
 import { formatEuro, formatInt, cn } from '@/lib/utils'
 import MesePicker from '@/components/ui/MesePicker'
+import Dialog from '@/components/ui/Dialog'
 import {
   fetchContrattiMese, fetchTargetTotaliRete, aggregaPerProdotto,
   topPdvPerContratti, ymPrecedente, tipoMese, giorniTotaliMese, giorniConsumati,
@@ -76,6 +77,10 @@ function HomeAdmin() {
 
   // Medie globali (solo Admin): caricate una sola volta a init pagina
   const [medie, setMedie] = useState(null)
+
+  // Modale spaccato per PdV (2026-09) — apre lo split di punti+contratti
+  // per ogni PdV nello scope, diviso per Mobile/Fisso/Energia.
+  const [spaccatoOpen, setSpaccatoOpen] = useState(false)
 
   // Compleanni di oggi (Admin/BO NON li vedono — handler lato helper)
   const [festeggiati, setFesteggiati] = useState([])
@@ -155,6 +160,38 @@ function HomeAdmin() {
   const targetTot = targetRete.mobile + targetRete.fisso + targetRete.energia
   const scostamento = totContratti - targetTot
   const scostamentoPct = targetTot > 0 ? Math.round((scostamento / targetTot) * 100) : 0
+
+  // Spaccato per PdV: per ogni PdV nello scope, calcolo punti e contratti
+  // scomposti per prodotto (Mobile/Fisso/Energia) + totale. Usato dalla
+  // modale che si apre cliccando sulla KPI "Punti totali" (§2026-09).
+  const spaccatoPerPdv = useMemo(() => {
+    const map = new Map()
+    for (const c of contratti) {
+      const id = c.pdv?.id
+      if (!id) continue
+      if (!map.has(id)) {
+        map.set(id, {
+          pdv_id: id,
+          pdv_nome: c.pdv.nome,
+          pdv_tipo: c.pdv.tipo,
+          pdv_area: c.pdv.area,
+          punti_mobile: 0,  punti_fisso: 0,  punti_energia: 0,  punti_totale: 0,
+          ctr_mobile: 0,    ctr_fisso: 0,    ctr_energia: 0,    ctr_totale: 0,
+        })
+      }
+      const cur = map.get(id)
+      // Punti: snapshot per gettonati/stornati, live per gli altri
+      const punti = (c.stato === 'gettonato' || c.stato === 'stornato')
+        ? (c.punti_snap || 0)
+        : (c.contratto_sottoprodotti || []).reduce((s, r) => s + (r.sottoprodotti?.punti || 0), 0)
+      cur.punti_totale += punti
+      cur.ctr_totale += 1
+      if (c.prodotto === 'mobile')  { cur.punti_mobile  += punti; cur.ctr_mobile  += 1 }
+      if (c.prodotto === 'fisso')   { cur.punti_fisso   += punti; cur.ctr_fisso   += 1 }
+      if (c.prodotto === 'energia') { cur.punti_energia += punti; cur.ctr_energia += 1 }
+    }
+    return Array.from(map.values()).sort((a, b) => b.punti_totale - a.punti_totale)
+  }, [contratti])
 
   // Dati per bar chart "Andamento target"
   const datiTarget = PRODOTTI.map(p => ({
@@ -247,7 +284,8 @@ function HomeAdmin() {
               icon={TrendingUp}
               label="Punti totali"
               value={formatInt(totPunti)}
-              hint="Validati / Gettonati / Stornati"
+              hint="Clicca per lo spaccato per PdV"
+              onClick={() => setSpaccatoOpen(true)}
             />
             {/* HR vede il fatturato PdV come il DV (allineato 2026-07). */}
             <KpiCard
@@ -514,6 +552,14 @@ function HomeAdmin() {
           )}
         </>
       )}
+
+      {/* Modale spaccato PdV (click sulla KPI Punti totali) — mostra per
+          ogni PdV lo split di punti e contratti per prodotto + totale. */}
+      <SpaccatoPuntiPdvDialog
+        open={spaccatoOpen}
+        onClose={() => setSpaccatoOpen(false)}
+        righe={spaccatoPerPdv}
+      />
     </div>
   )
 }
@@ -535,7 +581,7 @@ function SottoTitoloMedia({ titolo, sottotitolo }) {
   )
 }
 
-function KpiCard({ icon: Icon, label, value, hint, tone = 'neutral', accent }) {
+function KpiCard({ icon: Icon, label, value, hint, tone = 'neutral', accent, onClick }) {
   const valueColor =
     tone === 'success' ? 'text-success' :
     tone === 'danger'  ? 'text-danger'  :
@@ -547,10 +593,18 @@ function KpiCard({ icon: Icon, label, value, hint, tone = 'neutral', accent }) {
   const borderHover = accent
     ? { '--tw-hover-border': accent }
     : undefined
+  const isClickable = !!onClick
   return (
     <div
-      className="group rounded-2xl border border-border bg-surface p-5 shadow-soft transition hover:border-accent/40"
+      className={cn(
+        'group rounded-2xl border border-border bg-surface p-5 shadow-soft transition hover:border-accent/40',
+        isClickable && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg',
+      )}
       style={accent ? { ...borderHover } : undefined}
+      onClick={onClick}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e => (e.key === 'Enter' || e.key === ' ') && onClick()) : undefined}
     >
       <div className="flex items-center justify-between">
         <span className="text-sm text-text-muted">{label}</span>
@@ -584,4 +638,107 @@ const tooltipStyle = {
 function currentYM() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// -----------------------------------------------------------------------------
+// Modale "Spaccato per PdV" (§2026-09)
+// Click sulla KPI "Punti totali" → apre un dialog con una tabella per ogni
+// PdV nello scope, dove si vede lo split di punti E contratti per prodotto
+// (Mobile / Fisso / Energia) + il totale. Ordinata per punti totali desc.
+// -----------------------------------------------------------------------------
+function SpaccatoPuntiPdvDialog({ open, onClose, righe }) {
+  const totali = (righe || []).reduce((s, r) => ({
+    p_mob:  s.p_mob  + r.punti_mobile,
+    p_fis:  s.p_fis  + r.punti_fisso,
+    p_ene:  s.p_ene  + r.punti_energia,
+    p_tot:  s.p_tot  + r.punti_totale,
+    c_mob:  s.c_mob  + r.ctr_mobile,
+    c_fis:  s.c_fis  + r.ctr_fisso,
+    c_ene:  s.c_ene  + r.ctr_energia,
+    c_tot:  s.c_tot  + r.ctr_totale,
+  }), { p_mob: 0, p_fis: 0, p_ene: 0, p_tot: 0, c_mob: 0, c_fis: 0, c_ene: 0, c_tot: 0 })
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent-2">
+            <TrendingUp size={16} />
+          </span>
+          Spaccato per Punto Vendita
+        </span>
+      }
+      description={`${righe?.length || 0} PdV · ${formatInt(totali.p_tot)} punti totali · ${formatInt(totali.c_tot)} contratti`}
+    >
+      {(!righe || righe.length === 0) ? (
+        <div className="py-10 text-center text-sm text-text-muted">
+          Nessun contratto nel mese.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-text-muted">
+                <th rowSpan={2} className="border-b border-border px-3 py-2 align-bottom">
+                  Punto Vendita
+                </th>
+                <th colSpan={4} className="border-b border-r border-border bg-bg/40 px-3 py-2 text-center">
+                  Punti
+                </th>
+                <th colSpan={4} className="border-b border-border bg-bg/40 px-3 py-2 text-center">
+                  Contratti
+                </th>
+              </tr>
+              <tr className="text-right text-[10px] uppercase tracking-wider text-text-muted">
+                <th className="border-b border-border px-2 py-2 font-medium">Mobile</th>
+                <th className="border-b border-border px-2 py-2 font-medium">Fisso</th>
+                <th className="border-b border-border px-2 py-2 font-medium">Energia</th>
+                <th className="border-b border-r border-border px-2 py-2 font-medium text-white">Tot.</th>
+                <th className="border-b border-border px-2 py-2 font-medium">Mobile</th>
+                <th className="border-b border-border px-2 py-2 font-medium">Fisso</th>
+                <th className="border-b border-border px-2 py-2 font-medium">Energia</th>
+                <th className="border-b border-border px-2 py-2 font-medium text-white">Tot.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {righe.map(r => (
+                <tr key={r.pdv_id} className="border-t border-border hover:bg-white/5">
+                  <td className="px-3 py-2 text-white">
+                    <div className="font-medium">{r.pdv_nome}</div>
+                    <div className="text-[10px] text-text-muted">
+                      {r.pdv_tipo === 'sinergia' ? 'Sinergia' : 'Galleria'} · Area {r.pdv_area}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums" style={{ color: '#2B6CFF' }}>{formatInt(r.punti_mobile)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums" style={{ color: '#7A9BFF' }}>{formatInt(r.punti_fisso)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums" style={{ color: '#F5B042' }}>{formatInt(r.punti_energia)}</td>
+                  <td className="border-r border-border px-2 py-2 text-right font-semibold tabular-nums text-white">{formatInt(r.punti_totale)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums text-text-muted">{formatInt(r.ctr_mobile)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums text-text-muted">{formatInt(r.ctr_fisso)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums text-text-muted">{formatInt(r.ctr_energia)}</td>
+                  <td className="px-2 py-2 text-right font-semibold tabular-nums text-white">{formatInt(r.ctr_totale)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border bg-bg/40 text-sm font-semibold">
+                <td className="px-3 py-2 text-white">Totale</td>
+                <td className="px-2 py-2 text-right tabular-nums" style={{ color: '#2B6CFF' }}>{formatInt(totali.p_mob)}</td>
+                <td className="px-2 py-2 text-right tabular-nums" style={{ color: '#7A9BFF' }}>{formatInt(totali.p_fis)}</td>
+                <td className="px-2 py-2 text-right tabular-nums" style={{ color: '#F5B042' }}>{formatInt(totali.p_ene)}</td>
+                <td className="border-r border-border px-2 py-2 text-right tabular-nums text-white">{formatInt(totali.p_tot)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-text-muted">{formatInt(totali.c_mob)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-text-muted">{formatInt(totali.c_fis)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-text-muted">{formatInt(totali.c_ene)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-white">{formatInt(totali.c_tot)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </Dialog>
+  )
 }
