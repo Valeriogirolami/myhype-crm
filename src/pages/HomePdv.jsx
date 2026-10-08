@@ -16,8 +16,12 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Plus, FileCheck, TrendingUp, Coins, Target as TargetIcon, Loader2,
   Smartphone, Phone, Zap, Trophy, Users as UsersIcon, FileText,
-  ArrowUpRight, ArrowDownRight, Minus, Crown,
+  ArrowUpRight, ArrowDownRight, Minus, Crown, Package,
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
+import Dialog from '@/components/ui/Dialog'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { toast } from '@/lib/toast'
@@ -58,6 +62,11 @@ export default function HomePdv() {
     if (!profile?.id) return
     fetchCompleanniOggi(profile).then(setFesteggiati)
   }, [profile?.id])
+
+  // Donut distribuzione prodotti (§2026-10): toggle contratti/punti + zoom
+  // sottoprodotti al click sulla fetta — stesso pattern della Home admin.
+  const [donutView, setDonutView] = useState('contratti')
+  const [donutZoom, setDonutZoom] = useState(null)
 
   async function fetchAll() {
     setLoading(true)
@@ -114,6 +123,37 @@ export default function HomePdv() {
 
   // ===== KPI =====
   const aggr = useMemo(() => aggregaPerProdotto(contratti, meseSel), [contratti, meseSel])
+
+  // Dati donut distribuzione prodotti (§2026-10)
+  const PRODOTTI_COLORS = { mobile: '#2B6CFF', fisso: '#7A9BFF', energia: '#F5B042' }
+  const datiPie = PRODOTTI_VIS
+    .map(p => ({
+      name: p.l,
+      value: donutView === 'punti' ? aggr[p.v].punti : aggr[p.v].produzione,
+      color: PRODOTTI_COLORS[p.v],
+      prodottoKey: p.v,
+    }))
+    .filter(d => d.value > 0)
+
+  // Spaccato sottoprodotti del prodotto zoomato
+  const datiSottoprodotti = useMemo(() => {
+    if (!donutZoom) return []
+    const map = new Map()
+    for (const c of contratti) {
+      if (c.prodotto !== donutZoom) continue
+      const sps = (c.contratto_sottoprodotti || [])
+        .map(r => r.sottoprodotti)
+        .filter(Boolean)
+      for (const sp of sps) {
+        const nome = sp.nome || '(senza nome)'
+        const cur = map.get(nome) || { name: nome, contratti: 0, punti: 0 }
+        cur.contratti += 1
+        cur.punti += sp.punti || 0
+        map.set(nome, cur)
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.contratti - a.contratti)
+  }, [contratti, donutZoom])
   const totContratti = contratti.length
   const totPunti = contratti.reduce((s, c) => {
     const t = (c.stato === 'gettonato' || c.stato === 'stornato')
@@ -157,6 +197,17 @@ export default function HomePdv() {
         open={nuovoOpen}
         onClose={() => setNuovoOpen(false)}
         onCreated={fetchAll}
+      />
+
+      {/* Sotto-donut sottoprodotti — si apre al click su una fetta della donut
+          "Distribuzione prodotti". Sempre montato per non perdere lo stato. */}
+      <DistribuzioneSottoprodottiDialog
+        open={!!donutZoom}
+        onClose={() => setDonutZoom(null)}
+        prodotto={PRODOTTI_VIS.find(p => p.v === donutZoom)}
+        dati={datiSottoprodotti}
+        view={donutView}
+        setView={setDonutView}
       />
 
       {loading ? (
@@ -235,9 +286,19 @@ export default function HomePdv() {
         </div>
       </div>
 
-      {/* Riga: Ultimi contratti + Top venditori interni */}
+      {/* Riga: Distribuzione prodotti (donut cliccabile) + Ultimi contratti */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DistribuzioneProdottiCard
+          dati={datiPie}
+          view={donutView}
+          setView={setDonutView}
+          onZoom={(key) => setDonutZoom(key)}
+        />
         <UltimiContrattiCard ultimi={ultimi10} />
+      </div>
+
+      {/* Riga: Top venditori interni */}
+      <div className="mt-6">
         <TopVenditoriPdvCard righe={topVenditoriPdv} />
       </div>
 
@@ -418,4 +479,255 @@ function TopVenditoriPdvCard({ righe }) {
 function currentYM() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// -----------------------------------------------------------------------------
+// Donut distribuzione prodotti (HomePdv, 2026-10) — stesso pattern di Home.jsx.
+// Toggle contratti/punti + fetta cliccabile per aprire la sotto-donut.
+// -----------------------------------------------------------------------------
+function DistribuzioneProdottiCard({ dati, view, setView, onZoom }) {
+  const tooltipStyle = {
+    backgroundColor: '#141B3A',
+    border: '1px solid #232A4A',
+    borderRadius: 10,
+    color: '#F5F7FF',
+    fontSize: 12,
+  }
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium uppercase tracking-wider text-white">
+            Distribuzione prodotti
+          </h3>
+          <p className="mt-1 text-xs text-text-muted">
+            {view === 'punti'
+              ? 'Quota di punti per prodotto. Clicca una fetta per il dettaglio sottoprodotti.'
+              : 'Quota di contratti per prodotto. Clicca una fetta per il dettaglio sottoprodotti.'}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-bg p-1">
+          {[
+            { v: 'contratti', l: 'Contratti' },
+            { v: 'punti',     l: 'Punti' },
+          ].map(o => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => setView(o.v)}
+              className={cn(
+                'rounded-lg px-3 py-1 text-xs font-medium transition',
+                view === o.v
+                  ? 'bg-gradient-primary text-white shadow-soft'
+                  : 'text-text-muted hover:text-white',
+              )}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {dati.length === 0 ? (
+        <div className="mt-6 flex h-56 items-center justify-center text-sm text-text-muted">
+          Nessun contratto ancora nel mese
+        </div>
+      ) : (
+        <div className="mt-4 h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={dati}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+                className="cursor-pointer"
+                onClick={(d) => d?.prodottoKey && onZoom(d.prodottoKey)}
+                labelLine={{ stroke: '#A3ADC9', strokeWidth: 1 }}
+                label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+              >
+                {dati.map((d, i) => (
+                  <Cell key={i} fill={d.color} style={{ cursor: 'pointer' }} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(value, name) => {
+                  const totale = dati.reduce((s, d) => s + d.value, 0)
+                  const pct = totale > 0 ? (value / totale * 100).toFixed(1) : 0
+                  const unit = view === 'punti' ? 'pt' : (value === 1 ? 'contratto' : 'contratti')
+                  return [`${formatInt(value)} ${unit} (${pct}%) · clicca per dettaglio`, name]
+                }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 12 }}
+                formatter={(value, entry) => (
+                  <span className="text-text-muted">
+                    {value} <span className="tabular-nums text-white">({formatInt(entry.payload.value)})</span>
+                  </span>
+                )}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// -----------------------------------------------------------------------------
+// Sotto-donut sottoprodotti (HomePdv, 2026-10) — stessa UI di Home.jsx.
+// -----------------------------------------------------------------------------
+function DistribuzioneSottoprodottiDialog({ open, onClose, prodotto, dati, view, setView }) {
+  if (!prodotto) return null
+  const tooltipStyle = {
+    backgroundColor: '#141B3A',
+    border: '1px solid #232A4A',
+    borderRadius: 10,
+    color: '#F5F7FF',
+    fontSize: 12,
+  }
+  const key = view === 'punti' ? 'punti' : 'contratti'
+  const totale = (dati || []).reduce((s, d) => s + (d[key] || 0), 0)
+  const prodColor = prodotto.v === 'mobile' ? '#2B6CFF'
+    : prodotto.v === 'fisso' ? '#7A9BFF'
+    : '#F5B042'
+  const paletteBase = ['#2B6CFF', '#7A9BFF', '#F5B042', '#22c55e', '#a855f7', '#ec4899', '#facc15', '#10B981', '#EF4444', '#38BDF8']
+
+  const datiChart = (dati || [])
+    .map((d, i) => ({
+      name: d.name,
+      value: d[key] || 0,
+      color: paletteBase[i % paletteBase.length],
+      contratti: d.contratti,
+      punti: d.punti,
+    }))
+    .filter(d => d.value > 0)
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <span
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl"
+            style={{ background: `${prodColor}22`, color: prodColor }}
+          >
+            <Package size={16} />
+          </span>
+          Sottoprodotti · {prodotto.l}
+        </span>
+      }
+      description={`Spaccato dei sottoprodotti · vista ${view === 'punti' ? 'punti' : 'contratti'}`}
+    >
+      <div className="mb-4 flex items-center justify-end">
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-bg p-1">
+          {[
+            { v: 'contratti', l: 'Contratti' },
+            { v: 'punti',     l: 'Punti' },
+          ].map(o => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => setView(o.v)}
+              className={cn(
+                'rounded-lg px-3 py-1 text-xs font-medium transition',
+                view === o.v
+                  ? 'bg-gradient-primary text-white shadow-soft'
+                  : 'text-text-muted hover:text-white',
+              )}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {datiChart.length === 0 ? (
+        <div className="py-10 text-center text-sm text-text-muted">
+          Nessun sottoprodotto {prodotto.l.toLowerCase()} nel mese.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={datiChart}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={55}
+                  outerRadius={95}
+                  paddingAngle={2}
+                  labelLine={{ stroke: '#A3ADC9', strokeWidth: 1 }}
+                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+                >
+                  {datiChart.map((d, i) => <Cell key={i} fill={d.color} />)}
+                </Pie>
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value, name) => {
+                    const pct = totale > 0 ? (value / totale * 100).toFixed(1) : 0
+                    const unit = view === 'punti' ? 'pt' : (value === 1 ? 'contratto' : 'contratti')
+                    return [`${formatInt(value)} ${unit} (${pct}%)`, name]
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="rounded-xl border border-border">
+            <div className="flex items-center justify-between border-b border-border bg-bg/40 px-4 py-2 text-[11px] uppercase tracking-wider text-text-muted">
+              <span>Sottoprodotto</span>
+              <span>{view === 'punti' ? 'Punti' : 'Contratti'} · %</span>
+            </div>
+            <ul className="divide-y divide-border">
+              {datiChart.map((d) => {
+                const pct = totale > 0 ? (d.value / totale * 100) : 0
+                return (
+                  <li
+                    key={d.name}
+                    className="flex items-center justify-between gap-3 px-4 py-2.5"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-sm"
+                        style={{ backgroundColor: d.color }}
+                      />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm text-white">{d.name}</div>
+                        <div className="text-[11px] text-text-muted tabular-nums">
+                          {view === 'punti'
+                            ? `${formatInt(d.contratti)} contratti`
+                            : `${formatInt(d.punti)} pt`}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium tabular-nums text-white">
+                        {formatInt(d.value)}
+                      </div>
+                      <div className="text-[11px] tabular-nums text-text-muted">
+                        {pct.toFixed(1)}%
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+            <div className="flex items-center justify-between border-t border-border bg-bg/30 px-4 py-2 text-sm">
+              <span className="font-medium text-white">Totale</span>
+              <span className="font-semibold tabular-nums text-white">
+                {formatInt(totale)} {view === 'punti' ? 'pt' : 'ctr'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  )
 }
