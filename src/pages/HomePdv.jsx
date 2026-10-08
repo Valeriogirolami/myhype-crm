@@ -494,7 +494,10 @@ function DistribuzioneProdottiCard({ dati, view, setView, onZoom }) {
     fontSize: 12,
   }
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
+    // flex column + h-full così la card riempie l'altezza della cella del grid
+    // (uguale all'UltimiContrattiCard affiancata) e il grafico può occupare lo
+    // spazio rimanente invece di stare in h-64 fisso.
+    <div className="flex h-full flex-col rounded-2xl border border-border bg-surface p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-medium uppercase tracking-wider text-white">
@@ -529,19 +532,21 @@ function DistribuzioneProdottiCard({ dati, view, setView, onZoom }) {
       </div>
 
       {dati.length === 0 ? (
-        <div className="mt-6 flex h-56 items-center justify-center text-sm text-text-muted">
+        <div className="mt-6 flex flex-1 items-center justify-center text-sm text-text-muted">
           Nessun contratto ancora nel mese
         </div>
       ) : (
-        <div className="mt-4 h-64">
+        // flex-1 fa prendere al grafico tutto lo spazio verticale rimanente
+        // nella card; min-h evita che collassi se la card è bassa.
+        <div className="mt-4 flex-1" style={{ minHeight: 340 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <PieChart margin={{ top: 24, right: 12, bottom: 8, left: 12 }}>
               <Pie
                 data={dati}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={55}
-                outerRadius={85}
+                innerRadius="55%"
+                outerRadius="85%"
                 paddingAngle={3}
                 className="cursor-pointer"
                 onClick={(d) => d?.prodottoKey && onZoom(d.prodottoKey)}
@@ -563,6 +568,8 @@ function DistribuzioneProdottiCard({ dati, view, setView, onZoom }) {
               />
               <Legend
                 wrapperStyle={{ fontSize: 12 }}
+                verticalAlign="bottom"
+                height={32}
                 formatter={(value, entry) => (
                   <span className="text-text-muted">
                     {value} <span className="tabular-nums text-white">({formatInt(entry.payload.value)})</span>
